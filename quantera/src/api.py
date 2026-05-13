@@ -14,6 +14,7 @@ from src.retriever import retrieve_relevant_docs
 from src.generator import generate_response
 from src.vector_search import init_vector_table, embed_document, semantic_search, has_embeddings
 from src.agents.router import route_query, classify_query
+from src.kpi_store import init_kpi_table, get_kpi_trend, get_all_kpis_for_company, get_companies_with_kpis, get_available_metrics
 from src.utils import setup_logging
 from config.settings import settings
 
@@ -168,6 +169,57 @@ def query(question: str):
     close_db(conn)
 
 
+def kpi_trend(company: str, metric: str | None = None):
+    """Query KPI time-series data for a company.
+
+    Args:
+        company: Company name to query
+        metric: Optional specific metric (e.g. Revenue, EBITDA)
+    """
+    conn = init_db()
+    kpi_conn = init_kpi_table()
+
+    companies = get_companies_with_kpis(kpi_conn)
+    if not companies:
+        print("No KPIs stored yet. Run queries that extract KPIs first.")
+        close_db(conn)
+        close_db(kpi_conn)
+        return
+
+    if metric:
+        trend = get_kpi_trend(kpi_conn, company, metric)
+        if not trend:
+            print(f"No KPI trend found for {company} / {metric}")
+            close_db(conn)
+            close_db(kpi_conn)
+            return
+        print(f"\nKPI Trend: {company} — {metric}")
+        print("=" * 40)
+        for entry in trend:
+            value = entry["value"] if entry["value"] is not None else entry["value_raw"]
+            unit = f" {entry['unit']}" if entry["unit"] else ""
+            context = f" ({entry['context']})" if entry["context"] else ""
+            print(f"  {entry['period']}: {value}{unit}{context}")
+    else:
+        all_kpis = get_all_kpis_for_company(kpi_conn, company)
+        if not all_kpis:
+            print(f"No KPIs stored for {company}")
+            close_db(conn)
+            close_db(kpi_conn)
+            return
+        print(f"\nKPIs for {company}")
+        print("=" * 40)
+        for metric_name, entries in all_kpis.items():
+            print(f"\n  {metric_name}:")
+            for entry in entries:
+                value = entry["value"] if entry["value"] is not None else entry["value_raw"]
+                unit = f" {entry['unit']}" if entry["unit"] else ""
+                print(f"    {entry['period']}: {value}{unit}")
+
+    close_db(conn)
+    close_db(kpi_conn)
+
+
 def list_documents():
     """List all indexed documents."""
     conn = init_db()
@@ -193,6 +245,7 @@ if __name__ == "__main__":
         print("  python src/api.py query <question> - Query indexed documents (auto-routed)")
         print("  python src/api.py list             - List indexed documents")
         print("  python src/api.py classify <q>     - Show which agent would handle the query")
+        print("  python src/api.py kpi <company> [metric] - Show KPI trends")
         sys.exit(1)
 
     command = sys.argv[1]
@@ -212,6 +265,13 @@ if __name__ == "__main__":
             sys.exit(1)
         agent = classify_query(" ".join(sys.argv[2:]))
         print(f"Recommended agent: {agent}")
+    elif command == "kpi":
+        if len(sys.argv) < 3:
+            print("Error: kpi requires a company name")
+            sys.exit(1)
+        company = sys.argv[2]
+        metric = sys.argv[3] if len(sys.argv) > 3 else None
+        kpi_trend(company, metric)
     else:
         print(f"Unknown command: {command}")
         sys.exit(1)

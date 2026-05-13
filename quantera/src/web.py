@@ -25,6 +25,7 @@ from src.retriever import retrieve_relevant_docs
 from src.generator import generate_response
 from src.agents.router import route_query, classify_query
 from src.agents.kpi_agent import extract_kpis, format_kpi_response
+from src.kpi_store import init_kpi_table, get_kpi_trend, get_all_kpis_for_company, get_companies_with_kpis, get_available_metrics
 from src.utils import setup_logging
 from config.settings import settings
 
@@ -64,6 +65,22 @@ class QueryResponse(BaseModel):
 class ClassifyResponse(BaseModel):
     question: str
     recommended_agent: str
+
+
+class KPITrendResponse(BaseModel):
+    company: str
+    metric: str | None = None
+    data: list[dict]
+
+
+class KPICompanyResponse(BaseModel):
+    company: str
+    kpis: dict[str, list[dict]]
+
+
+class KPIListResponse(BaseModel):
+    companies: list[str]
+    metrics: list[str]
 
 
 class DocumentInfo(BaseModel):
@@ -175,6 +192,34 @@ def classify_question(request: QueryRequest):
     """Classify a query to determine which sub-agent should handle it."""
     agent = classify_query(request.question)
     return ClassifyResponse(question=request.question, recommended_agent=agent)
+
+
+@app.get("/kpi/companies", response_model=KPIListResponse)
+def list_kpi_companies():
+    """List companies and metrics with stored KPI data."""
+    kpi_conn = init_kpi_table()
+    companies = get_companies_with_kpis(kpi_conn)
+    metrics = get_available_metrics(kpi_conn)
+    close_db(kpi_conn)
+    return KPIListResponse(companies=companies, metrics=metrics)
+
+
+@app.get("/kpi/{company}", response_model=KPICompanyResponse)
+def get_company_kpis(company: str):
+    """Get all KPIs for a company."""
+    kpi_conn = init_kpi_table()
+    kpis = get_all_kpis_for_company(kpi_conn, company)
+    close_db(kpi_conn)
+    return KPICompanyResponse(company=company, kpis=kpis)
+
+
+@app.get("/kpi/{company}/{metric}", response_model=KPITrendResponse)
+def get_kpi_trend(company: str, metric: str):
+    """Get time-series KPI data for a company and specific metric."""
+    kpi_conn = init_kpi_table()
+    trend = get_kpi_trend(kpi_conn, company, metric)
+    close_db(kpi_conn)
+    return KPITrendResponse(company=company, metric=metric, data=trend)
 
 
 @app.get("/documents", response_model=DocumentListResponse)

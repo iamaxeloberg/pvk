@@ -1,0 +1,17 @@
+[
+    {
+        "file": "techcorp_q1.pdf",
+        "expected_company": "TechCorp AB",
+        "expected_categories": ["financial report", "earnings", "quarterly results"]
+    },
+    {
+        "file": "nordic_retail_h1.pdf",
+        "expected_company": "Nordic Retail Group",
+        "expected_categories": ["market analysis", "retail", "semi-annual report"]
+    },
+    {
+        "file": "greenenergy_annual.xlsx",
+        "expected_company": "GreenEnergy Solutions",
+        "expected_categories": ["annual report", "sustainability", "energy sector"]
+    }
+]

@@ -2,6 +2,7 @@
 
 import json
 import logging
+import sqlite3
 from pathlib import Path
 from litellm import completion
 from config.settings import settings
@@ -10,12 +11,17 @@ from src.utils import read_prompt
 logger = logging.getLogger(__name__)
 
 
-def extract_kpis(user_query: str, relevant_documents: list[str]) -> dict:
+def extract_kpis(
+    user_query: str,
+    relevant_documents: list[str],
+    db_conn: sqlite3.Connection | None = None,
+) -> dict:
     """Extract key performance indicators from relevant documents.
 
     Args:
         user_query: The user's query about financial metrics
         relevant_documents: List of Markdown file paths to analyse
+        db_conn: Optional SQLite connection to store KPIs for time-series tracking
 
     Returns:
         Dict with company, period, and list of KPI objects
@@ -60,6 +66,14 @@ def extract_kpis(user_query: str, relevant_documents: list[str]) -> dict:
     try:
         kpis = json.loads(result_text)
         logger.info(f"Extracted {len(kpis.get('kpis', []))} KPIs for query: {user_query}")
+
+        if db_conn is not None:
+            from src.kpi_store import store_kpis
+
+            source = relevant_documents[0] if relevant_documents else ""
+            stored = store_kpis(db_conn, kpis, source)
+            kpis["kpis_stored"] = stored
+
         return kpis
     except json.JSONDecodeError as e:
         logger.error(f"Failed to parse KPI JSON: {e}")
