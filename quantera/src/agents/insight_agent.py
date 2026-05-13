@@ -4,7 +4,7 @@ import logging
 from pathlib import Path
 from litellm import completion
 from config.settings import settings
-from src.utils import read_prompt
+from src.utils import read_prompt, get_llm_content
 
 logger = logging.getLogger(__name__)
 
@@ -26,6 +26,8 @@ def generate_insights(user_query: str, relevant_documents: list[str]) -> str:
         path = Path(doc_path)
         if path.exists():
             content = path.read_text(encoding="utf-8")
+            if len(content) > settings.max_doc_size_chars:
+                content = content[: settings.max_doc_size_chars] + "\n\n[Document truncated due to size...]"
             doc_contents.append(f"--- Document: {path.name} ---\n{content}")
         else:
             logger.warning(f"Document not found: {doc_path}")
@@ -48,6 +50,6 @@ def generate_insights(user_query: str, relevant_documents: list[str]) -> str:
         max_tokens=settings.max_tokens,
     )
 
-    result = response.choices[0].message.content.strip()
+    result = get_llm_content(response)
     logger.info(f"Generated financial insights for query: {user_query}")
     return result

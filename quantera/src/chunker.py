@@ -70,7 +70,7 @@ def chunk_text(text: str, source_file: str = "", chunk_size: int | None = None, 
 
             overlap_paragraphs = _get_overlap_paragraphs(current_text, chunk_overlap)
             current_text = overlap_paragraphs
-            current_start = end_pos - len(overlap_paragraphs)
+            current_start = max(0, end_pos - len(overlap_paragraphs))
 
         if current_text:
             current_text += "\n\n" + para

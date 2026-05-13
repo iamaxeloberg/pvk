@@ -20,6 +20,8 @@ class Settings(BaseSettings):
     chunk_size: int = 4000
     chunk_overlap: int = 200
 
+    max_doc_size_chars: int = 100000
+
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
 
     @property

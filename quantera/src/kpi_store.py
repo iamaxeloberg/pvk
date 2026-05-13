@@ -13,6 +13,11 @@ _QUARTER_MAP = {"q1": 1, "q2": 2, "q3": 3, "q4": 4}
 _HALF_MAP = {"h1": 1, "h2": 2}
 
 
+def _escape_like(value: str) -> str:
+    """Escape SQL LIKE wildcard characters in a search value."""
+    return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+
+
 def _period_sort_key(period: str) -> tuple:
     """Parse a period string into a sortable (year, sub_period) tuple.
 
@@ -89,7 +94,7 @@ def store_kpis(conn: sqlite3.Connection, kpi_data: dict, source_file: str = "") 
     stored = 0
     for kpi in kpis:
         metric = kpi.get("metric", "")
-        value_raw = str(kpi.get("value", ""))
+        value_raw = str(kpi.get("value", "")) if kpi.get("value") is not None else ""
 
         try:
             value = float(kpi.get("value"))
@@ -129,8 +134,8 @@ def get_kpi_trend(
     cursor = conn.execute(
         """SELECT period, value, value_raw, unit, context, source_file, extracted_at
            FROM kpi_store
-           WHERE company LIKE ? AND metric LIKE ?""",
-        (f"%{company}%", f"%{metric}%"),
+           WHERE company LIKE ? ESCAPE '\\' AND metric LIKE ? ESCAPE '\\'""",
+        (f"%{_escape_like(company)}%", f"%{_escape_like(metric)}%"),
     )
     rows = cursor.fetchall()
     results = [
@@ -162,8 +167,8 @@ def get_all_kpis_for_company(conn: sqlite3.Connection, company: str) -> dict[str
     cursor = conn.execute(
         """SELECT metric, period, value, value_raw, unit, context, source_file
            FROM kpi_store
-           WHERE company LIKE ?""",
-        (f"%{company}%",),
+           WHERE company LIKE ? ESCAPE '\\'""",
+        (f"%{_escape_like(company)}%",),
     )
     rows = cursor.fetchall()
 
@@ -204,6 +209,6 @@ def delete_kpis_for_company(conn: sqlite3.Connection, company: str) -> int:
     Returns:
         Number of rows deleted
     """
-    cursor = conn.execute("DELETE FROM kpi_store WHERE company LIKE ?", (f"%{company}%",))
+    cursor = conn.execute("DELETE FROM kpi_store WHERE company LIKE ? ESCAPE '\\'", (f"%{_escape_like(company)}%",))
     conn.commit()
     return cursor.rowcount

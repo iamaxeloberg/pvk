@@ -10,7 +10,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from litellm import completion
 from config.settings import settings
-from src.utils import read_prompt
+from src.utils import read_prompt, get_llm_content
 
 logger = logging.getLogger(__name__)
 
@@ -141,7 +141,7 @@ Do not include any text outside the JSON."""
             max_tokens=512,
         )
 
-        result_text = response.choices[0].message.content.strip()
+        result_text = get_llm_content(response)
         parts = result_text.split("```")
         if len(parts) > 1:
             result_text = parts[1]
@@ -151,15 +151,21 @@ Do not include any text outside the JSON."""
 
         scores = json.loads(result_text)
 
+        def _safe_float(val, default=0.0) -> float:
+            try:
+                return float(val)
+            except (ValueError, TypeError):
+                return default
+
         result = AssessmentResult(
             query=query,
             expected_answer=expected_answer,
             actual_answer=actual_answer,
             agent_used=agent_used,
-            factual_accuracy=float(scores.get("factual_accuracy", 0)),
-            completeness=float(scores.get("completeness", 0)),
-            consistency=float(scores.get("consistency", 0)),
-            overall_score=float(scores.get("overall_score", 0)),
+            factual_accuracy=_safe_float(scores.get("factual_accuracy")),
+            completeness=_safe_float(scores.get("completeness")),
+            consistency=_safe_float(scores.get("consistency")),
+            overall_score=_safe_float(scores.get("overall_score")),
             feedback=scores.get("feedback", ""),
         )
 

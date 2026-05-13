@@ -8,7 +8,7 @@ import sys
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from src.agents.router import classify_query, VALID_AGENTS
+from src.agents.router import classify_query, route_query, VALID_AGENTS
 from src.agents import router as router_module
 from src.agents.kpi_agent import extract_kpis, format_kpi_response
 from src.agents.insight_agent import generate_insights

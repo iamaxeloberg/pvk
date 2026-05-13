@@ -4,7 +4,7 @@ import logging
 from pathlib import Path
 from litellm import completion
 from config.settings import settings
-from src.utils import read_prompt
+from src.utils import read_prompt, get_llm_content
 
 logger = logging.getLogger(__name__)
 
@@ -36,7 +36,7 @@ def retrieve_relevant_docs(conn, user_query: str) -> list[str]:
         max_tokens=512,
     )
 
-    result_text = response.choices[0].message.content.strip()
+    result_text = get_llm_content(response)
 
     # Parse file paths from response (one per line)
     paths = [line.strip() for line in result_text.split("\n") if line.strip()]

@@ -7,6 +7,18 @@ from config.settings import settings
 
 logger = logging.getLogger(__name__)
 
+_pdf_model_dict = None
+
+
+def _get_pdf_model_dict():
+    """Lazy-load and cache the Marker model dict to avoid reloading on every PDF."""
+    global _pdf_model_dict
+    if _pdf_model_dict is None:
+        from marker.models import create_model_dict
+
+        _pdf_model_dict = create_model_dict()
+    return _pdf_model_dict
+
 
 def _to_markdown_table(headers: list[str], rows: list[list[str]]) -> str:
     """Convert headers and rows into a Markdown table string."""
@@ -102,7 +114,6 @@ def convert_to_markdown(file_path: Path, output_dir: Path | None = None) -> Path
 def _convert_pdf(file_path: Path, output_dir: Path | None = None) -> Path:
     """Convert a PDF file to Markdown using Marker."""
     from marker.converters.pdf import PDFConverter
-    from marker.models import create_model_dict
     from marker.output import text_from_rendered
 
     output_dir = output_dir or settings.markdown_dir_obj
@@ -110,7 +121,7 @@ def _convert_pdf(file_path: Path, output_dir: Path | None = None) -> Path:
 
     logger.info(f"Converting PDF {file_path} to Markdown...")
 
-    converter = PDFConverter(artifacts=create_model_dict())
+    converter = PDFConverter(artifacts=_get_pdf_model_dict())
     rendered = converter(file_path)
     text, _, images = text_from_rendered(rendered)
 

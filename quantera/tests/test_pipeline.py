@@ -43,5 +43,5 @@ class TestPipelineErrorHandling:
     def test_converter_handles_missing_file(self):
         """Converter should handle missing input files gracefully."""
         from src.converter import convert_to_markdown
-        with pytest.raises(Exception):
+        with pytest.raises((FileNotFoundError, ValueError)):
             convert_to_markdown(Path("/nonexistent/file.pdf"))

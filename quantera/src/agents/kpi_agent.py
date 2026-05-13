@@ -6,7 +6,7 @@ import sqlite3
 from pathlib import Path
 from litellm import completion
 from config.settings import settings
-from src.utils import read_prompt
+from src.utils import read_prompt, get_llm_content
 
 logger = logging.getLogger(__name__)
 
@@ -33,6 +33,8 @@ def extract_kpis(
         path = Path(doc_path)
         if path.exists():
             content = path.read_text(encoding="utf-8")
+            if len(content) > settings.max_doc_size_chars:
+                content = content[: settings.max_doc_size_chars] + "\n\n[Document truncated due to size...]"
             doc_contents.append(f"--- Document: {path.name} ---\n{content}")
         else:
             logger.warning(f"Document not found: {doc_path}")
@@ -55,7 +57,7 @@ def extract_kpis(
         max_tokens=2048,
     )
 
-    result_text = response.choices[0].message.content.strip()
+    result_text = get_llm_content(response)
 
     parts = result_text.split("```")
     if len(parts) > 1:

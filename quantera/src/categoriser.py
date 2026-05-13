@@ -5,7 +5,7 @@ import logging
 from pathlib import Path
 from litellm import completion
 from config.settings import settings
-from src.utils import read_prompt
+from src.utils import read_prompt, get_llm_content
 
 logger = logging.getLogger(__name__)
 
@@ -43,7 +43,7 @@ def extract_metadata(markdown_content: str, markdown_path: Path) -> dict:
         max_tokens=512,
     )
 
-    result_text = response.choices[0].message.content.strip()
+    result_text = get_llm_content(response)
 
     # Parse JSON from response (handle potential markdown code blocks)
     parts = result_text.split("```")

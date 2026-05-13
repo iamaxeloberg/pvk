@@ -43,6 +43,7 @@ def run_pipeline():
         md_path = settings.markdown_dir_obj / (fp.stem + ".md")
         if md_path.exists():
             convert_skipped += 1
+            md_files.append(md_path)
             logger.info(f"Skipping already converted: {fp.name}")
         else:
             try:
@@ -60,26 +61,30 @@ def run_pipeline():
     index_skipped = 0
     index_failed = []
     embedded = 0
-    for md_path in md_files:
-        try:
-            if is_document_indexed(conn, str(md_path)):
-                index_skipped += 1
-                logger.info(f"Skipping already indexed: {md_path.name}")
-                continue
-            content = md_path.read_text(encoding="utf-8")
-            metadata = extract_metadata(content, md_path)
-            insert_document(conn, metadata["company"], metadata["categories"], metadata["markdown_file_path"])
-            indexed += 1
+    try:
+        for md_path in md_files:
+            try:
+                if is_document_indexed(conn, str(md_path)):
+                    index_skipped += 1
+                    logger.info(f"Skipping already indexed: {md_path.name}")
+                    continue
+                content = md_path.read_text(encoding="utf-8")
+                metadata = extract_metadata(content, md_path)
+                company = metadata.get("company", "Unknown")
+                categories = metadata.get("categories", [])
+                insert_document(conn, company, categories, metadata.get("markdown_file_path", str(md_path)))
+                indexed += 1
 
-            if embed_document(vector_conn, md_path):
-                embedded += 1
-        except Exception as e:
-            index_failed.append((md_path.name, str(e)))
-            logger.error(f"Failed to index {md_path}: {e}")
+                if embed_document(vector_conn, md_path):
+                    embedded += 1
+            except Exception as e:
+                index_failed.append((md_path.name, str(e)))
+                logger.error(f"Failed to index {md_path}: {e}")
 
-    count = get_document_count(conn)
-    close_db(conn)
-    close_db(vector_conn)
+        count = get_document_count(conn)
+    finally:
+        close_db(conn)
+        close_db(vector_conn)
 
     # Summary report
     print("\n" + "=" * 50)
@@ -119,54 +124,53 @@ def query(question: str):
     print(f"Query: {question}\n")
 
     conn = init_db()
-
-    count = get_document_count(conn)
-    if count == 0:
-        print("No documents indexed. Run the ingestion pipeline first.")
-        close_db(conn)
-        return
-
-    print(f"Searching {count} indexed documents...")
-
-    # Step 1: Retrieve relevant documents (semantic search with LLM fallback)
-    relevant_paths = []
-    if has_embeddings(conn):
-        vector_conn = init_vector_table()
-        results = semantic_search(vector_conn, question, top_k=5)
-        close_db(vector_conn)
-        if results:
-            relevant_paths = [path for path, _score in results]
-            print(f"  (semantic search: {len(relevant_paths)} results)")
-        else:
-            print("  (semantic search returned no results, falling back to LLM retrieval)")
-
-    if not relevant_paths:
-        try:
-            relevant_paths = retrieve_relevant_docs(conn, question)
-        except Exception as e:
-            print(f"Error during retrieval: {e}")
-            logger.error(f"Retrieval error: {e}")
-            close_db(conn)
+    try:
+        count = get_document_count(conn)
+        if count == 0:
+            print("No documents indexed. Run the ingestion pipeline first.")
             return
 
-    if not relevant_paths:
-        print("No relevant documents found for this query.")
+        print(f"Searching {count} indexed documents...")
+
+        # Step 1: Retrieve relevant documents (semantic search with LLM fallback)
+        relevant_paths = []
+        if has_embeddings(conn):
+            vector_conn = init_vector_table()
+            try:
+                results = semantic_search(vector_conn, question, top_k=5)
+            finally:
+                close_db(vector_conn)
+            if results:
+                relevant_paths = [path for path, _score in results]
+                print(f"  (semantic search: {len(relevant_paths)} results)")
+            else:
+                print("  (semantic search returned no results, falling back to LLM retrieval)")
+
+        if not relevant_paths:
+            try:
+                relevant_paths = retrieve_relevant_docs(conn, question)
+            except Exception as e:
+                print(f"Error during retrieval: {e}")
+                logger.error(f"Retrieval error: {e}")
+                return
+
+        if not relevant_paths:
+            print("No relevant documents found for this query.")
+            return
+
+        print(f"Found {len(relevant_paths)} relevant document(s).")
+
+        # Step 2: Route to appropriate sub-agent and generate response
+        print("Routing to specialised agent...\n")
+        try:
+            result = route_query(question, relevant_paths)
+            print(f"Agent used: {result.get('agent_used', 'unknown')}")
+            print(f"\n{result.get('response', 'No response generated.')}")
+        except Exception as e:
+            print(f"Error generating response: {e}")
+            logger.error(f"Generation error: {e}")
+    finally:
         close_db(conn)
-        return
-
-    print(f"Found {len(relevant_paths)} relevant document(s).")
-
-    # Step 2: Route to appropriate sub-agent and generate response
-    print("Routing to specialised agent...\n")
-    try:
-        result = route_query(question, relevant_paths)
-        print(f"Agent used: {result['agent_used']}")
-        print(f"\n{result['response']}")
-    except Exception as e:
-        print(f"Error generating response: {e}")
-        logger.error(f"Generation error: {e}")
-
-    close_db(conn)
 
 
 def kpi_trend(company: str, metric: str | None = None):

@@ -23,7 +23,7 @@ from src.indexer import (
 )
 from src.retriever import retrieve_relevant_docs
 from src.generator import generate_response
-from src.agents.router import route_query, classify_query
+from src.agents.router import route_query, classify_query, VALID_AGENTS
 from src.agents.kpi_agent import extract_kpis, format_kpi_response
 from src.kpi_store import init_kpi_table, get_kpi_trend, get_all_kpis_for_company, get_companies_with_kpis, get_available_metrics
 from src.utils import setup_logging
@@ -112,6 +112,7 @@ def run_ingestion():
         md_path = settings.markdown_dir_obj / (fp.stem + ".md")
         if md_path.exists():
             convert_skipped += 1
+            md_files.append(md_path)
         else:
             try:
                 md_path = convert_to_markdown(fp)
@@ -121,24 +122,28 @@ def run_ingestion():
                 logger.error(f"Failed to convert {fp}: {e}")
 
     conn = init_db()
-    indexed = 0
-    index_skipped = 0
-    indexing_failures = []
-    for md_path in md_files:
-        try:
-            if is_document_indexed(conn, str(md_path)):
-                index_skipped += 1
-                continue
-            content = md_path.read_text(encoding="utf-8")
-            metadata = extract_metadata(content, md_path)
-            insert_document(conn, metadata["company"], metadata["categories"], metadata["markdown_file_path"])
-            indexed += 1
-        except Exception as e:
-            indexing_failures.append(f"{md_path.name}: {e}")
-            logger.error(f"Failed to index {md_path}: {e}")
+    try:
+        indexed = 0
+        index_skipped = 0
+        indexing_failures = []
+        for md_path in md_files:
+            try:
+                if is_document_indexed(conn, str(md_path)):
+                    index_skipped += 1
+                    continue
+                content = md_path.read_text(encoding="utf-8")
+                metadata = extract_metadata(content, md_path)
+                company = metadata.get("company", "Unknown")
+                categories = metadata.get("categories", [])
+                insert_document(conn, company, categories, metadata.get("markdown_file_path", str(md_path)))
+                indexed += 1
+            except Exception as e:
+                indexing_failures.append(f"{md_path.name}: {e}")
+                logger.error(f"Failed to index {md_path}: {e}")
 
-    count = get_document_count(conn)
-    close_db(conn)
+        count = get_document_count(conn)
+    finally:
+        close_db(conn)
 
     return IngestResponse(
         total_input=len(input_files),
@@ -156,35 +161,36 @@ def run_ingestion():
 def query_documents(request: QueryRequest):
     """Query indexed documents using the AI agent router."""
     conn = init_db()
-
-    count = get_document_count(conn)
-    if count == 0:
-        close_db(conn)
-        raise HTTPException(status_code=404, detail="No documents indexed. Run the ingestion pipeline first.")
-
     try:
-        relevant_paths = retrieve_relevant_docs(conn, request.question)
-    except Exception as e:
-        close_db(conn)
-        raise HTTPException(status_code=500, detail=f"Retrieval error: {e}")
+        count = get_document_count(conn)
+        if count == 0:
+            raise HTTPException(status_code=404, detail="No documents indexed. Run the ingestion pipeline first.")
 
-    if not relevant_paths:
-        close_db(conn)
-        return QueryResponse(question=request.question, answer="No relevant documents found.", agent_used="general", relevant_documents=[])
+        try:
+            relevant_paths = retrieve_relevant_docs(conn, request.question)
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Retrieval error: {e}")
 
-    try:
-        result = route_query(request.question, relevant_paths, agent=request.agent)
-    except Exception as e:
-        close_db(conn)
-        raise HTTPException(status_code=500, detail=f"Query error: {e}")
+        if not relevant_paths:
+            return QueryResponse(question=request.question, answer="No relevant documents found.", agent_used="general", relevant_documents=[])
 
-    close_db(conn)
-    return QueryResponse(
-        question=request.question,
-        answer=result["response"],
-        agent_used=result["agent_used"],
-        relevant_documents=result["relevant_documents"],
-    )
+        try:
+            agent = request.agent
+            if agent and agent not in VALID_AGENTS:
+                logger.warning(f"Invalid agent '{agent}' requested, defaulting to auto-routing")
+                agent = None
+            result = route_query(request.question, relevant_paths, agent=agent)
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Query error: {e}")
+
+        return QueryResponse(
+            question=request.question,
+            answer=result.get("response", "No response generated."),
+            agent_used=result.get("agent_used", "unknown"),
+            relevant_documents=result.get("relevant_documents", []),
+        )
+    finally:
+        close_db(conn)
 
 
 @app.post("/classify", response_model=ClassifyResponse)
@@ -239,9 +245,14 @@ def list_documents():
 @app.delete("/documents/{markdown_path:path}")
 def delete_doc(markdown_path: str):
     """Delete a document from the index."""
+    if ".." in markdown_path:
+        raise HTTPException(status_code=400, detail="Path traversal not allowed")
+
     conn = init_db()
-    deleted = delete_document(conn, markdown_path)
-    close_db(conn)
+    try:
+        deleted = delete_document(conn, markdown_path)
+    finally:
+        close_db(conn)
 
     if not deleted:
         raise HTTPException(status_code=404, detail=f"Document not found: {markdown_path}")

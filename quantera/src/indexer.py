@@ -9,6 +9,11 @@ from config.settings import settings
 logger = logging.getLogger(__name__)
 
 
+def _escape_like(value: str) -> str:
+    """Escape SQL LIKE wildcard characters in a search value."""
+    return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+
+
 def init_db(db_path: Path | None = None) -> sqlite3.Connection:
     """Initialise SQLite database and create tables if they don't exist."""
     path = db_path or settings.db_path_obj
@@ -65,8 +70,8 @@ def get_all_documents(conn: sqlite3.Connection) -> list[dict]:
 def get_documents_by_company(conn: sqlite3.Connection, company: str) -> list[dict]:
     """Retrieve documents for a specific company."""
     cursor = conn.execute(
-        "SELECT id, company, categories, markdown_file_path FROM documents WHERE company LIKE ?",
-        (f"%{company}%",),
+        "SELECT id, company, categories, markdown_file_path FROM documents WHERE company LIKE ? ESCAPE '\\'",
+        (f"%{_escape_like(company)}%",),
     )
     rows = cursor.fetchall()
     return [
@@ -83,8 +88,8 @@ def get_documents_by_company(conn: sqlite3.Connection, company: str) -> list[dic
 def get_documents_by_category(conn: sqlite3.Connection, category: str) -> list[dict]:
     """Retrieve documents matching a specific category."""
     cursor = conn.execute(
-        "SELECT id, company, categories, markdown_file_path FROM documents WHERE categories LIKE ?",
-        (f"%{category}%",),
+        "SELECT id, company, categories, markdown_file_path FROM documents WHERE categories LIKE ? ESCAPE '\\'",
+        (f"%{_escape_like(category)}%",),
     )
     rows = cursor.fetchall()
     return [

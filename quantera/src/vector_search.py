@@ -132,7 +132,11 @@ def semantic_search(
 
     results = []
     for path, embedding_json in rows:
-        doc_embedding = json.loads(embedding_json)
+        try:
+            doc_embedding = json.loads(embedding_json)
+        except json.JSONDecodeError:
+            logger.warning(f"Corrupted embedding for {path}, skipping")
+            continue
         score = _cosine_similarity(query_embedding, doc_embedding)
         if score >= threshold:
             results.append((path, round(score, 4)))

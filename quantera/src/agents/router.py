@@ -3,7 +3,7 @@
 import logging
 from litellm import completion
 from config.settings import settings
-from src.utils import read_prompt
+from src.utils import read_prompt, get_llm_content
 
 logger = logging.getLogger(__name__)
 
@@ -35,7 +35,7 @@ def classify_query(user_query: str) -> str:
         max_tokens=16,
     )
 
-    result = response.choices[0].message.content.strip().lower()
+    result = get_llm_content(response).lower()
 
     if result not in VALID_AGENTS:
         logger.warning(f"Router returned invalid agent '{result}', defaulting to 'general'")

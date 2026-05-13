@@ -28,6 +28,26 @@ def setup_logging(level: str = "INFO", log_to_file: bool = True) -> None:
     logging.basicConfig(level=getattr(logging, level.upper()), format=log_format, handlers=handlers)
 
 
+def get_llm_content(response) -> str:
+    """Safely extract content from an LLM response.
+
+    Args:
+        response: LiteLLM completion response
+
+    Returns:
+        The message content string
+
+    Raises:
+        ValueError: If the response has no choices or content
+    """
+    if not response.choices:
+        raise ValueError("LLM returned empty response (no choices)")
+    content = response.choices[0].message.content
+    if content is None:
+        raise ValueError("LLM returned empty content")
+    return content.strip()
+
+
 def ensure_dir(path: Path) -> Path:
     """Ensure a directory exists, creating it if necessary."""
     path.mkdir(parents=True, exist_ok=True)
@@ -40,6 +60,11 @@ def read_prompt(name: str) -> str:
     Args:
         name: Prompt name without extension (e.g. 'categorisation')
               or a full file path.
+
+    Raises:
+        FileNotFoundError: If the prompt file does not exist
     """
     path = Path(name) if Path(name).is_absolute() else Path("prompts") / f"{name}.txt"
+    if not path.exists():
+        raise FileNotFoundError(f"Prompt file not found: {path}")
     return path.read_text(encoding="utf-8")
