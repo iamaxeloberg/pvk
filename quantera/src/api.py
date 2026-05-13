@@ -13,6 +13,7 @@ from src.indexer import init_db, insert_document, get_all_documents, get_documen
 from src.retriever import retrieve_relevant_docs
 from src.generator import generate_response
 from src.vector_search import init_vector_table, embed_document, semantic_search, has_embeddings
+from src.agents.router import route_query, classify_query
 from src.utils import setup_logging
 from config.settings import settings
 
@@ -154,11 +155,12 @@ def query(question: str):
 
     print(f"Found {len(relevant_paths)} relevant document(s).")
 
-    # Step 2: Generate response
-    print("Generating response...\n")
+    # Step 2: Route to appropriate sub-agent and generate response
+    print("Routing to specialised agent...\n")
     try:
-        response = generate_response(question, relevant_paths)
-        print(response)
+        result = route_query(question, relevant_paths)
+        print(f"Agent used: {result['agent_used']}")
+        print(f"\n{result['response']}")
     except Exception as e:
         print(f"Error generating response: {e}")
         logger.error(f"Generation error: {e}")
@@ -188,8 +190,9 @@ if __name__ == "__main__":
     if len(sys.argv) < 2:
         print("Usage:")
         print("  python src/api.py ingest          - Run ingestion pipeline")
-        print("  python src/api.py query <question> - Query indexed documents")
+        print("  python src/api.py query <question> - Query indexed documents (auto-routed)")
         print("  python src/api.py list             - List indexed documents")
+        print("  python src/api.py classify <q>     - Show which agent would handle the query")
         sys.exit(1)
 
     command = sys.argv[1]
@@ -203,6 +206,12 @@ if __name__ == "__main__":
         query(" ".join(sys.argv[2:]))
     elif command == "list":
         list_documents()
+    elif command == "classify":
+        if len(sys.argv) < 3:
+            print("Error: classify requires a question")
+            sys.exit(1)
+        agent = classify_query(" ".join(sys.argv[2:]))
+        print(f"Recommended agent: {agent}")
     else:
         print(f"Unknown command: {command}")
         sys.exit(1)

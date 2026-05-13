@@ -23,6 +23,8 @@ from src.indexer import (
 )
 from src.retriever import retrieve_relevant_docs
 from src.generator import generate_response
+from src.agents.router import route_query, classify_query
+from src.agents.kpi_agent import extract_kpis, format_kpi_response
 from src.utils import setup_logging
 from config.settings import settings
 
@@ -38,6 +40,7 @@ app = FastAPI(
 
 class QueryRequest(BaseModel):
     question: str
+    agent: str | None = None
 
 
 class IngestResponse(BaseModel):
@@ -54,7 +57,13 @@ class IngestResponse(BaseModel):
 class QueryResponse(BaseModel):
     question: str
     answer: str
+    agent_used: str
     relevant_documents: list[str]
+
+
+class ClassifyResponse(BaseModel):
+    question: str
+    recommended_agent: str
 
 
 class DocumentInfo(BaseModel):
@@ -128,7 +137,7 @@ def run_ingestion():
 
 @app.post("/query", response_model=QueryResponse)
 def query_documents(request: QueryRequest):
-    """Query indexed documents and get an AI-generated response."""
+    """Query indexed documents using the AI agent router."""
     conn = init_db()
 
     count = get_document_count(conn)
@@ -144,16 +153,28 @@ def query_documents(request: QueryRequest):
 
     if not relevant_paths:
         close_db(conn)
-        return QueryResponse(question=request.question, answer="No relevant documents found.", relevant_documents=[])
+        return QueryResponse(question=request.question, answer="No relevant documents found.", agent_used="general", relevant_documents=[])
 
     try:
-        response = generate_response(request.question, relevant_paths)
+        result = route_query(request.question, relevant_paths, agent=request.agent)
     except Exception as e:
         close_db(conn)
-        raise HTTPException(status_code=500, detail=f"Generation error: {e}")
+        raise HTTPException(status_code=500, detail=f"Query error: {e}")
 
     close_db(conn)
-    return QueryResponse(question=request.question, answer=response, relevant_documents=relevant_paths)
+    return QueryResponse(
+        question=request.question,
+        answer=result["response"],
+        agent_used=result["agent_used"],
+        relevant_documents=result["relevant_documents"],
+    )
+
+
+@app.post("/classify", response_model=ClassifyResponse)
+def classify_question(request: QueryRequest):
+    """Classify a query to determine which sub-agent should handle it."""
+    agent = classify_query(request.question)
+    return ClassifyResponse(question=request.question, recommended_agent=agent)
 
 
 @app.get("/documents", response_model=DocumentListResponse)
