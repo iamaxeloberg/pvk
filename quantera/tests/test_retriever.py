@@ -2,11 +2,12 @@
 
 import pytest
 from pathlib import Path
+from unittest.mock import patch, MagicMock
 import sys
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from src.retriever import build_index_context
+from src.retriever import build_index_context, retrieve_relevant_docs
 from src.indexer import init_db, insert_document, close_db
 from src.utils import read_prompt
 
@@ -41,3 +42,57 @@ class TestRetriever:
     def test_retrieve_relevant_docs_requires_llm(self, db_conn):
         """Full retrieval test requires LLM API."""
         pytest.skip("Requires LLM API configuration")
+
+    @patch("src.retriever.completion")
+    def test_retrieve_relevant_docs_with_mock(self, mock_completion, db_conn):
+        """Test retrieval using mocked LLM response."""
+        mock_response = MagicMock()
+        mock_response.choices = [MagicMock()]
+        mock_response.choices[0].message.content = "/data/techcorp.md"
+        mock_completion.return_value = mock_response
+
+        result = retrieve_relevant_docs(db_conn, "What was TechCorp revenue?")
+
+        assert len(result) == 1
+        assert "/data/techcorp.md" in result
+        mock_completion.assert_called_once()
+
+    @patch("src.retriever.completion")
+    def test_retrieve_filters_invalid_paths(self, mock_completion, db_conn):
+        """Test that paths not in the database are filtered out."""
+        mock_response = MagicMock()
+        mock_response.choices = [MagicMock()]
+        mock_response.choices[0].message.content = "/data/techcorp.md\n/data/nonexistent.md"
+        mock_completion.return_value = mock_response
+
+        result = retrieve_relevant_docs(db_conn, "query")
+
+        assert len(result) == 1
+        assert "/data/techcorp.md" in result
+        assert "/data/nonexistent.md" not in result
+
+    @patch("src.retriever.completion")
+    def test_retrieve_handles_empty_response(self, mock_completion, db_conn):
+        """Test handling of empty LLM response."""
+        mock_response = MagicMock()
+        mock_response.choices = [MagicMock()]
+        mock_response.choices[0].message.content = ""
+        mock_completion.return_value = mock_response
+
+        result = retrieve_relevant_docs(db_conn, "query")
+
+        assert result == []
+
+    @patch("src.retriever.completion")
+    def test_retrieve_handles_multiple_paths(self, mock_completion, db_conn):
+        """Test retrieval returning multiple valid documents."""
+        mock_response = MagicMock()
+        mock_response.choices = [MagicMock()]
+        mock_response.choices[0].message.content = "/data/techcorp.md\n/data/retailco.md"
+        mock_completion.return_value = mock_response
+
+        result = retrieve_relevant_docs(db_conn, "compare companies")
+
+        assert len(result) == 2
+        assert "/data/techcorp.md" in result
+        assert "/data/retailco.md" in result

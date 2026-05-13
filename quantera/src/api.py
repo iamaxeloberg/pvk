@@ -12,6 +12,7 @@ from src.categoriser import extract_metadata
 from src.indexer import init_db, insert_document, get_all_documents, get_document_count, is_document_indexed, close_db
 from src.retriever import retrieve_relevant_docs
 from src.generator import generate_response
+from src.vector_search import init_vector_table, embed_document, semantic_search, has_embeddings
 from src.utils import setup_logging
 from config.settings import settings
 
@@ -52,9 +53,11 @@ def run_pipeline():
     # Step 3: Categorise and index (skip already indexed)
     print("Categorising and indexing documents...")
     conn = init_db()
+    vector_conn = init_vector_table()
     indexed = 0
     index_skipped = 0
     index_failed = []
+    embedded = 0
     for md_path in md_files:
         try:
             if is_document_indexed(conn, str(md_path)):
@@ -65,12 +68,16 @@ def run_pipeline():
             metadata = extract_metadata(content, md_path)
             insert_document(conn, metadata["company"], metadata["categories"], metadata["markdown_file_path"])
             indexed += 1
+
+            if embed_document(vector_conn, md_path):
+                embedded += 1
         except Exception as e:
             index_failed.append((md_path.name, str(e)))
             logger.error(f"Failed to index {md_path}: {e}")
 
     count = get_document_count(conn)
     close_db(conn)
+    close_db(vector_conn)
 
     # Summary report
     print("\n" + "=" * 50)
@@ -83,6 +90,7 @@ def run_pipeline():
     print(f"  Newly indexed:          {indexed}")
     print(f"  Skipped (already done): {index_skipped}")
     print(f"  Indexing failures:      {len(index_failed)}")
+    print(f"  Embeddings created:     {embedded}")
     print(f"  Total in database:      {count}")
 
     if convert_failed:
@@ -101,6 +109,8 @@ def run_pipeline():
 def query(question: str):
     """Query the indexed documents and get an AI-generated response.
 
+    Uses semantic search if embeddings are available, falls back to LLM-based retrieval.
+
     Args:
         question: Natural language query about the indexed financial data
     """
@@ -116,14 +126,26 @@ def query(question: str):
 
     print(f"Searching {count} indexed documents...")
 
-    # Step 1: Retrieve relevant documents
-    try:
-        relevant_paths = retrieve_relevant_docs(conn, question)
-    except Exception as e:
-        print(f"Error during retrieval: {e}")
-        logger.error(f"Retrieval error: {e}")
-        close_db(conn)
-        return
+    # Step 1: Retrieve relevant documents (semantic search with LLM fallback)
+    relevant_paths = []
+    if has_embeddings(conn):
+        vector_conn = init_vector_table()
+        results = semantic_search(vector_conn, question, top_k=5)
+        close_db(vector_conn)
+        if results:
+            relevant_paths = [path for path, _score in results]
+            print(f"  (semantic search: {len(relevant_paths)} results)")
+        else:
+            print("  (semantic search returned no results, falling back to LLM retrieval)")
+
+    if not relevant_paths:
+        try:
+            relevant_paths = retrieve_relevant_docs(conn, question)
+        except Exception as e:
+            print(f"Error during retrieval: {e}")
+            logger.error(f"Retrieval error: {e}")
+            close_db(conn)
+            return
 
     if not relevant_paths:
         print("No relevant documents found for this query.")

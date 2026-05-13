@@ -15,6 +15,7 @@ from src.indexer import (
     get_documents_by_category,
     get_document_count,
     delete_document,
+    is_document_indexed,
     close_db,
 )
 
@@ -72,3 +73,8 @@ class TestIndexer:
 
     def test_delete_nonexistent(self, db_conn):
         assert delete_document(db_conn, "/nonexistent.md") is False
+
+    def test_is_document_indexed(self, db_conn):
+        insert_document(db_conn, "TechCorp", ["report"], "/path/tech.md")
+        assert is_document_indexed(db_conn, "/path/tech.md") is True
+        assert is_document_indexed(db_conn, "/path/other.md") is False

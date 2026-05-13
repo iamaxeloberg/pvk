@@ -18,6 +18,9 @@ help:
 install:
 	python3 -m pip install -e ".[dev]"
 
+install-vector:
+	python3 -m pip install -e ".[dev,vector]"
+
 serve:
 	python3 -m uvicorn src.web:app --reload --host 0.0.0.0 --port 8000
 
