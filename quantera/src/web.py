@@ -214,7 +214,7 @@ def get_company_kpis(company: str):
 
 
 @app.get("/kpi/{company}/{metric}", response_model=KPITrendResponse)
-def get_kpi_trend(company: str, metric: str):
+def get_kpi_trend_endpoint(company: str, metric: str):
     """Get time-series KPI data for a company and specific metric."""
     kpi_conn = init_kpi_table()
     trend = get_kpi_trend(kpi_conn, company, metric)

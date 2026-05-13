@@ -58,19 +58,18 @@ class AssessmentReport:
             return 0.0
         return sum(r.consistency for r in self.results) / len(self.results)
 
-    @property
     def pass_rate(self, threshold: float = 0.7) -> float:
         if not self.results:
             return 0.0
         passed = sum(1 for r in self.results if r.passed(threshold))
         return passed / len(self.results)
 
-    def summary(self) -> str:
+    def summary(self, threshold: float = 0.7) -> str:
         lines = [
             "Assessment Report",
             "=" * 40,
             f"Total evaluations: {len(self.results)}",
-            f"Pass rate (threshold 0.7): {self.pass_rate:.0%}",
+            f"Pass rate (threshold {threshold}): {self.pass_rate(threshold):.0%}",
             f"Average factual accuracy: {self.average_accuracy:.2f}",
             f"Average completeness: {self.average_completeness:.2f}",
             f"Average consistency: {self.average_consistency:.2f}",
@@ -137,13 +136,15 @@ Do not include any text outside the JSON."""
             model=settings.high_capacity_llm_model,
             messages=messages,
             api_key=settings.high_capacity_llm_api_key or None,
+            api_base=getattr(settings, "high_capacity_llm_api_base", None) or None,
             temperature=0.0,
             max_tokens=512,
         )
 
         result_text = response.choices[0].message.content.strip()
-        if result_text.startswith("```"):
-            result_text = result_text.split("```")[1]
+        parts = result_text.split("```")
+        if len(parts) > 1:
+            result_text = parts[1]
             if result_text.startswith("json"):
                 result_text = result_text[4:]
         result_text = result_text.strip()

@@ -49,8 +49,8 @@ def chunk_text(text: str, source_file: str = "", chunk_size: int | None = None, 
     chunks: list[Chunk] = []
     current_text = ""
     current_start = 0
-    overlap_text = ""
     chunk_index = 0
+    scan_pos = 0
 
     for para in paragraphs:
         para = para.strip()
@@ -75,8 +75,12 @@ def chunk_text(text: str, source_file: str = "", chunk_size: int | None = None, 
         if current_text:
             current_text += "\n\n" + para
         else:
+            para_pos = text.find(para, scan_pos)
+            if para_pos == -1:
+                para_pos = scan_pos
             current_text = para
-            current_start = text.find(para, current_start)
+            current_start = para_pos
+            scan_pos = para_pos + len(para)
 
     if current_text:
         end_pos = current_start + len(current_text)

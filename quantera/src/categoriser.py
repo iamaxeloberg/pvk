@@ -46,8 +46,9 @@ def extract_metadata(markdown_content: str, markdown_path: Path) -> dict:
     result_text = response.choices[0].message.content.strip()
 
     # Parse JSON from response (handle potential markdown code blocks)
-    if result_text.startswith("```"):
-        result_text = result_text.split("```")[1]
+    parts = result_text.split("```")
+    if len(parts) > 1:
+        result_text = parts[1]
         if result_text.startswith("json"):
             result_text = result_text[4:]
     result_text = result_text.strip()

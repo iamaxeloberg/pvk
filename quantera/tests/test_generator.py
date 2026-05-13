@@ -83,15 +83,3 @@ class TestGenerator:
         user_content = call_kwargs["messages"][1]["content"]
         assert "Company A" in user_content
         assert "Company B" in user_content
-
-    def test_generate_response_with_docs(self, tmp_path):
-        """Test response generation with actual document content."""
-        doc_path = tmp_path / "test.md"
-        doc_path.write_text("# Test Company\nRevenue: SEK 100M\n", encoding="utf-8")
-        pytest.skip("Requires LLM API configuration")
-
-    def test_generate_response_missing_doc(self, tmp_path):
-        """Test handling of missing document files."""
-        doc_path = tmp_path / "nonexistent.md"
-        response = generate_response("Query?", [str(doc_path)])
-        assert "No relevant documents" in response
