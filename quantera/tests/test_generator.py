@@ -6,12 +6,13 @@ import sys
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from src.generator import generate_response, load_prompt
+from src.generator import generate_response
+from src.utils import read_prompt
 
 
 class TestGenerator:
-    def test_load_prompt(self):
-        prompt = load_prompt()
+    def test_read_prompt(self):
+        prompt = read_prompt("master_prompt")
         assert "financial" in prompt.lower() or "analysis" in prompt.lower()
 
     def test_generate_response_no_docs(self):

@@ -17,6 +17,9 @@ class Settings(BaseSettings):
     temperature: float = 0.0
     max_tokens: int = 4096
 
+    chunk_size: int = 4000
+    chunk_overlap: int = 200
+
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
 
     @property

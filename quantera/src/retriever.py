@@ -4,6 +4,7 @@ import logging
 from pathlib import Path
 from litellm import completion
 from config.settings import settings
+from src.utils import read_prompt
 
 logger = logging.getLogger(__name__)
 
@@ -19,7 +20,7 @@ def retrieve_relevant_docs(conn, user_query: str) -> list[str]:
         List of Markdown file paths that are relevant to the query
     """
     index_context = build_index_context(conn)
-    prompt = load_prompt()
+    prompt = read_prompt("retrieval")
 
     messages = [
         {"role": "system", "content": prompt},
@@ -61,9 +62,3 @@ def build_index_context(conn) -> str:
     for company, categories, path in rows:
         lines.append(f"Company: {company} | Categories: {categories} | Path: {path}")
     return "\n".join(lines) if lines else "No documents indexed."
-
-
-def load_prompt(prompt_path: str | None = None) -> str:
-    """Load the retrieval prompt from file."""
-    path = Path(prompt_path or "prompts/retrieval.txt")
-    return path.read_text(encoding="utf-8")

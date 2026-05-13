@@ -104,6 +104,12 @@ def get_document_count(conn: sqlite3.Connection) -> int:
     return cursor.fetchone()[0]
 
 
+def is_document_indexed(conn: sqlite3.Connection, markdown_path: str) -> bool:
+    """Check if a document is already in the index."""
+    cursor = conn.execute("SELECT 1 FROM documents WHERE markdown_file_path = ?", (markdown_path,))
+    return cursor.fetchone() is not None
+
+
 def delete_document(conn: sqlite3.Connection, markdown_path: str) -> bool:
     """Delete a document from the index."""
     cursor = conn.execute("DELETE FROM documents WHERE markdown_file_path = ?", (markdown_path,))

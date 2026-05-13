@@ -4,6 +4,7 @@ import logging
 from pathlib import Path
 from litellm import completion
 from config.settings import settings
+from src.utils import read_prompt
 
 logger = logging.getLogger(__name__)
 
@@ -18,7 +19,7 @@ def generate_response(user_query: str, relevant_documents: list[str]) -> str:
     Returns:
         Generated response from the LLM
     """
-    master_prompt = load_prompt()
+    master_prompt = read_prompt("master_prompt")
 
     # Load document contents
     doc_contents = []
@@ -51,9 +52,3 @@ def generate_response(user_query: str, relevant_documents: list[str]) -> str:
     result = response.choices[0].message.content.strip()
     logger.info(f"Generated response for query: {user_query}")
     return result
-
-
-def load_prompt(prompt_path: str | None = None) -> str:
-    """Load the master prompt from file."""
-    path = Path(prompt_path or "prompts/master_prompt.txt")
-    return path.read_text(encoding="utf-8")

@@ -6,12 +6,13 @@ import sys
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from src.categoriser import extract_metadata, load_prompt
+from src.categoriser import extract_metadata
+from src.utils import read_prompt
 
 
 class TestCategoriser:
-    def test_load_prompt(self):
-        prompt = load_prompt()
+    def test_read_prompt(self):
+        prompt = read_prompt("categorisation")
         assert "company" in prompt.lower()
         assert "categories" in prompt.lower()
 

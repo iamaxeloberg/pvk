@@ -6,8 +6,9 @@ import sys
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from src.retriever import build_index_context, load_prompt
+from src.retriever import build_index_context
 from src.indexer import init_db, insert_document, close_db
+from src.utils import read_prompt
 
 
 class TestRetriever:
@@ -33,8 +34,8 @@ class TestRetriever:
         assert "No documents" in context
         close_db(conn)
 
-    def test_load_prompt(self):
-        prompt = load_prompt()
+    def test_read_prompt(self):
+        prompt = read_prompt("retrieval")
         assert "query" in prompt.lower() or "relevant" in prompt.lower()
 
     def test_retrieve_relevant_docs_requires_llm(self, db_conn):

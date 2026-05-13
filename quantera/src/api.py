@@ -1,23 +1,21 @@
 """API layer - terminal interface + callable Python API."""
 
-import sys
 import logging
+import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from src.ingestion import get_input_files
-from src.converter import convert_batch
+from src.converter import convert_to_markdown
 from src.categoriser import extract_metadata
-from src.indexer import init_db, insert_document, get_all_documents, get_document_count, close_db
+from src.indexer import init_db, insert_document, get_all_documents, get_document_count, is_document_indexed, close_db
 from src.retriever import retrieve_relevant_docs
 from src.generator import generate_response
+from src.utils import setup_logging
 from config.settings import settings
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-)
+setup_logging()
 logger = logging.getLogger(__name__)
 
 
@@ -33,30 +31,71 @@ def run_pipeline():
 
     print(f"Found {len(input_files)} input file(s).")
 
-    # Step 2: Convert to Markdown
-    print("Converting to Markdown...")
-    md_files = convert_batch(input_files)
-    if not md_files:
-        print("No files were successfully converted.")
-        return
-    print(f"Converted {len(md_files)} file(s).")
+    # Step 2: Convert to Markdown (skip already converted)
+    print("\nConverting to Markdown...")
+    md_files = []
+    convert_skipped = 0
+    convert_failed = []
+    for fp in input_files:
+        md_path = settings.markdown_dir_obj / (fp.stem + ".md")
+        if md_path.exists():
+            convert_skipped += 1
+            logger.info(f"Skipping already converted: {fp.name}")
+        else:
+            try:
+                md_path = convert_to_markdown(fp)
+                md_files.append(md_path)
+            except Exception as e:
+                convert_failed.append((fp.name, str(e)))
+                logger.error(f"Failed to convert {fp}: {e}")
 
-    # Step 3: Categorise and index
-    print("Categorising documents...")
+    # Step 3: Categorise and index (skip already indexed)
+    print("Categorising and indexing documents...")
     conn = init_db()
+    indexed = 0
+    index_skipped = 0
+    index_failed = []
     for md_path in md_files:
         try:
+            if is_document_indexed(conn, str(md_path)):
+                index_skipped += 1
+                logger.info(f"Skipping already indexed: {md_path.name}")
+                continue
             content = md_path.read_text(encoding="utf-8")
             metadata = extract_metadata(content, md_path)
             insert_document(conn, metadata["company"], metadata["categories"], metadata["markdown_file_path"])
-            print(f"  Indexed: {metadata['company']} - {metadata['categories']}")
+            indexed += 1
         except Exception as e:
-            print(f"  Failed to index {md_path}: {e}")
+            index_failed.append((md_path.name, str(e)))
             logger.error(f"Failed to index {md_path}: {e}")
 
     count = get_document_count(conn)
     close_db(conn)
-    print(f"\nPipeline complete. {count} document(s) indexed.")
+
+    # Summary report
+    print("\n" + "=" * 50)
+    print("INGESTION SUMMARY")
+    print("=" * 50)
+    print(f"  Input files found:      {len(input_files)}")
+    print(f"  Converted (new):        {len(md_files)}")
+    print(f"  Skipped (already done): {convert_skipped}")
+    print(f"  Conversion failures:    {len(convert_failed)}")
+    print(f"  Newly indexed:          {indexed}")
+    print(f"  Skipped (already done): {index_skipped}")
+    print(f"  Indexing failures:      {len(index_failed)}")
+    print(f"  Total in database:      {count}")
+
+    if convert_failed:
+        print("\nConversion failures:")
+        for name, err in convert_failed:
+            print(f"  - {name}: {err}")
+
+    if index_failed:
+        print("\nIndexing failures:")
+        for name, err in index_failed:
+            print(f"  - {name}: {err}")
+
+    print("=" * 50)
 
 
 def query(question: str):
