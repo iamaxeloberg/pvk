@@ -176,13 +176,11 @@ def kpi_trend(company: str, metric: str | None = None):
         company: Company name to query
         metric: Optional specific metric (e.g. Revenue, EBITDA)
     """
-    conn = init_db()
     kpi_conn = init_kpi_table()
 
     companies = get_companies_with_kpis(kpi_conn)
     if not companies:
         print("No KPIs stored yet. Run queries that extract KPIs first.")
-        close_db(conn)
         close_db(kpi_conn)
         return
 
@@ -190,7 +188,6 @@ def kpi_trend(company: str, metric: str | None = None):
         trend = get_kpi_trend(kpi_conn, company, metric)
         if not trend:
             print(f"No KPI trend found for {company} / {metric}")
-            close_db(conn)
             close_db(kpi_conn)
             return
         print(f"\nKPI Trend: {company} — {metric}")
@@ -204,7 +201,6 @@ def kpi_trend(company: str, metric: str | None = None):
         all_kpis = get_all_kpis_for_company(kpi_conn, company)
         if not all_kpis:
             print(f"No KPIs stored for {company}")
-            close_db(conn)
             close_db(kpi_conn)
             return
         print(f"\nKPIs for {company}")
@@ -216,7 +212,6 @@ def kpi_trend(company: str, metric: str | None = None):
                 unit = f" {entry['unit']}" if entry["unit"] else ""
                 print(f"    {entry['period']}: {value}{unit}")
 
-    close_db(conn)
     close_db(kpi_conn)
 
 

@@ -2,11 +2,42 @@
 
 import json
 import logging
+import re
 import sqlite3
 from pathlib import Path
 from config.settings import settings
 
 logger = logging.getLogger(__name__)
+
+_QUARTER_MAP = {"q1": 1, "q2": 2, "q3": 3, "q4": 4}
+_HALF_MAP = {"h1": 1, "h2": 2}
+
+
+def _period_sort_key(period: str) -> tuple:
+    """Parse a period string into a sortable (year, sub_period) tuple.
+
+    Handles: "Q1 2025", "Q4 2024", "H1 2025", "FY 2024", "2025", etc.
+    Unknown formats sort to (9999, 0).
+    """
+    period_lower = period.lower().strip()
+
+    match = re.match(r"q([1-4])\s*(\d{4})", period_lower)
+    if match:
+        return (int(match.group(2)), int(match.group(1)))
+
+    match = re.match(r"h([1-2])\s*(\d{4})", period_lower)
+    if match:
+        return (int(match.group(2)), int(match.group(1)) + 4)
+
+    match = re.match(r"fy\s*(\d{4})", period_lower)
+    if match:
+        return (int(match.group(1)), 9)
+
+    match = re.match(r"(\d{4})", period_lower)
+    if match:
+        return (int(match.group(1)), 0)
+
+    return (9999, 0)
 
 
 def init_kpi_table(db_path: Path | None = None) -> sqlite3.Connection:
@@ -98,12 +129,11 @@ def get_kpi_trend(
     cursor = conn.execute(
         """SELECT period, value, value_raw, unit, context, source_file, extracted_at
            FROM kpi_store
-           WHERE company LIKE ? AND metric LIKE ?
-           ORDER BY period""",
+           WHERE company LIKE ? AND metric LIKE ?""",
         (f"%{company}%", f"%{metric}%"),
     )
     rows = cursor.fetchall()
-    return [
+    results = [
         {
             "period": r[0],
             "value": r[1],
@@ -115,6 +145,8 @@ def get_kpi_trend(
         }
         for r in rows
     ]
+    results.sort(key=lambda x: _period_sort_key(x["period"]))
+    return results
 
 
 def get_all_kpis_for_company(conn: sqlite3.Connection, company: str) -> dict[str, list[dict]]:
@@ -130,8 +162,7 @@ def get_all_kpis_for_company(conn: sqlite3.Connection, company: str) -> dict[str
     cursor = conn.execute(
         """SELECT metric, period, value, value_raw, unit, context, source_file
            FROM kpi_store
-           WHERE company LIKE ?
-           ORDER BY metric, period""",
+           WHERE company LIKE ?""",
         (f"%{company}%",),
     )
     rows = cursor.fetchall()
@@ -148,6 +179,9 @@ def get_all_kpis_for_company(conn: sqlite3.Connection, company: str) -> dict[str
             "context": context,
             "source_file": source,
         })
+
+    for entries in grouped.values():
+        entries.sort(key=lambda x: _period_sort_key(x["period"]))
 
     return grouped
 

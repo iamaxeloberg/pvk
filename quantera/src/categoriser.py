@@ -53,7 +53,11 @@ def extract_metadata(markdown_content: str, markdown_path: Path) -> dict:
             result_text = result_text[4:]
     result_text = result_text.strip()
 
-    metadata = json.loads(result_text)
+    try:
+        metadata = json.loads(result_text)
+    except json.JSONDecodeError as e:
+        logger.error(f"Failed to parse categorisation JSON: {e}")
+        raise ValueError(f"LLM returned malformed JSON: {result_text[:200]}") from e
 
     # Ensure markdown_file_path is set correctly
     metadata["markdown_file_path"] = str(markdown_path)

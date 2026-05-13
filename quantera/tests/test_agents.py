@@ -8,7 +8,8 @@ import sys
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from src.agents.router import classify_query, route_query, VALID_AGENTS
+from src.agents.router import classify_query, VALID_AGENTS
+from src.agents import router as router_module
 from src.agents.kpi_agent import extract_kpis, format_kpi_response
 from src.agents.insight_agent import generate_insights
 from src.agents.briefing_agent import generate_briefing
@@ -63,16 +64,19 @@ class TestAgentRouter:
         result = classify_query("test query")
         assert result == "kpi"
 
-    @patch("src.agents.router.route_query")
-    def test_route_with_explicit_agent(self, mock_route):
-        mock_route.return_value = {
-            "agent_used": "kpi",
-            "response": "Revenue: 100M",
-            "relevant_documents": ["/doc.md"],
-        }
+    @patch("src.agents.kpi_agent.completion")
+    def test_route_with_explicit_kpi_agent(self, mock_completion):
+        """Test that passing agent='kpi' routes to the KPI agent."""
+        mock_completion.return_value.choices = [MagicMock()]
+        mock_completion.return_value.choices[0].message.content = json.dumps({
+            "company": "TestCo",
+            "period": "Q1",
+            "kpis": [{"metric": "Revenue", "value": 100, "unit": "M", "context": ""}],
+        })
 
-        result = route_query("What is revenue?", ["/doc.md"], agent="kpi")
+        result = router_module.route_query("What is revenue?", ["/doc.md"], agent="kpi")
         assert result["agent_used"] == "kpi"
+        assert "TestCo" in result["response"]
 
 
 class TestKPIAgent:

@@ -142,3 +142,16 @@ class TestKPIStore:
         trend = get_kpi_trend(kpi_conn, "TechCorp", "Revenue")
         periods = [e["period"] for e in trend]
         assert periods == sorted(periods)
+
+    def test_kpi_trend_ordered_across_years(self, kpi_conn):
+        """Periods must sort chronologically across year boundaries, not lexicographically."""
+        for period in ["Q1 2026", "Q4 2025", "Q2 2025", "Q1 2025", "FY 2024"]:
+            store_kpis(kpi_conn, {
+                "company": "TechCorp",
+                "period": period,
+                "kpis": [{"metric": "Revenue", "value": 100, "unit": "M", "context": ""}],
+            }, "/data/tech.md")
+
+        trend = get_kpi_trend(kpi_conn, "TechCorp", "Revenue")
+        periods = [e["period"] for e in trend]
+        assert periods == ["FY 2024", "Q1 2025", "Q2 2025", "Q4 2025", "Q1 2026"]

@@ -74,3 +74,14 @@ class TestCategoriser:
         user_content = call_args.kwargs["messages"][1]["content"]
         assert len(user_content) < 10000
         assert "truncated" in user_content.lower()
+
+    @patch("src.categoriser.completion")
+    def test_extract_metadata_raises_on_malformed_json(self, mock_completion):
+        """Test that malformed LLM JSON response raises ValueError instead of crashing."""
+        mock_response = MagicMock()
+        mock_response.choices = [MagicMock()]
+        mock_response.choices[0].message.content = "This is not JSON at all, just some random text"
+        mock_completion.return_value = mock_response
+
+        with pytest.raises(ValueError, match="malformed JSON"):
+            extract_metadata("# Test", Path("/data/test.md"))
