@@ -113,7 +113,7 @@ def convert_to_markdown(file_path: Path, output_dir: Path | None = None) -> Path
 
 def _convert_pdf(file_path: Path, output_dir: Path | None = None) -> Path:
     """Convert a PDF file to Markdown using Marker."""
-    from marker.converters.pdf import PDFConverter
+    from marker.converters.pdf import PdfConverter
     from marker.output import text_from_rendered
 
     output_dir = output_dir or settings.markdown_dir_obj
@@ -121,9 +121,9 @@ def _convert_pdf(file_path: Path, output_dir: Path | None = None) -> Path:
 
     logger.info(f"Converting PDF {file_path} to Markdown...")
 
-    converter = PDFConverter(artifacts=_get_pdf_model_dict())
-    rendered = converter(file_path)
-    text, _, images = text_from_rendered(rendered)
+    converter = PdfConverter(artifact_dict=_get_pdf_model_dict())
+    rendered = converter(str(file_path))
+    text, _, _ = text_from_rendered(rendered)
 
     md_filename = file_path.stem + ".md"
     md_path = output_dir / md_filename

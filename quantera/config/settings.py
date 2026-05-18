@@ -9,6 +9,7 @@ class Settings(BaseSettings):
 
     high_capacity_llm_model: str = "anthropic/claude-3-5-sonnet-20241022"
     high_capacity_llm_api_key: str = ""
+    high_capacity_llm_api_base: str = ""
 
     db_path: str = "data/quantera.db"
     input_dir: str = "data/input"

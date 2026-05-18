@@ -32,7 +32,7 @@ def classify_query(user_query: str) -> str:
         api_key=settings.low_cost_llm_api_key or None,
         api_base=settings.low_cost_llm_api_base or None,
         temperature=0.0,
-        max_tokens=16,
+        max_tokens=1024,
     )
 
     result = get_llm_content(response).lower()

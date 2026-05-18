@@ -40,7 +40,7 @@ def extract_metadata(markdown_content: str, markdown_path: Path) -> dict:
         api_key=settings.low_cost_llm_api_key or None,
         api_base=settings.low_cost_llm_api_base or None,
         temperature=0.0,
-        max_tokens=512,
+        max_tokens=1024,
     )
 
     result_text = get_llm_content(response)

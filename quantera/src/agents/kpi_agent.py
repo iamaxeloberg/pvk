@@ -53,8 +53,9 @@ def extract_kpis(
         model=settings.high_capacity_llm_model,
         messages=messages,
         api_key=settings.high_capacity_llm_api_key or None,
+        api_base=settings.high_capacity_llm_api_base or None,
         temperature=0.0,
-        max_tokens=2048,
+        max_tokens=settings.max_tokens,
     )
 
     result_text = get_llm_content(response)
@@ -67,7 +68,9 @@ def extract_kpis(
     result_text = result_text.strip()
 
     try:
-        kpis = json.loads(result_text)
+        parsed = json.loads(result_text)
+        # Model may return a list of objects instead of a single object
+        kpis = parsed[0] if isinstance(parsed, list) and parsed else parsed
         logger.info(f"Extracted {len(kpis.get('kpis', []))} KPIs for query: {user_query}")
 
         if db_conn is not None:

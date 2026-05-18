@@ -48,6 +48,7 @@ def generate_response(user_query: str, relevant_documents: list[str]) -> str:
         model=settings.high_capacity_llm_model,
         messages=messages,
         api_key=settings.high_capacity_llm_api_key or None,
+        api_base=settings.high_capacity_llm_api_base or None,
         temperature=settings.temperature,
         max_tokens=settings.max_tokens,
     )
