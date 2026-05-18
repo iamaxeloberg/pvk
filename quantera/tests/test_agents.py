@@ -65,8 +65,10 @@ class TestAgentRouter:
         assert result == "kpi"
 
     @patch("src.agents.kpi_agent.completion")
-    def test_route_with_explicit_kpi_agent(self, mock_completion):
+    def test_route_with_explicit_kpi_agent(self, mock_completion, tmp_path):
         """Test that passing agent='kpi' routes to the KPI agent."""
+        doc = tmp_path / "doc.md"
+        doc.write_text("# TestCo\nRevenue: 100M", encoding="utf-8")
         mock_completion.return_value.choices = [MagicMock()]
         mock_completion.return_value.choices[0].message.content = json.dumps({
             "company": "TestCo",
@@ -74,14 +76,16 @@ class TestAgentRouter:
             "kpis": [{"metric": "Revenue", "value": 100, "unit": "M", "context": ""}],
         })
 
-        result = router_module.route_query("What is revenue?", ["/doc.md"], agent="kpi")
+        result = router_module.route_query("What is revenue?", [str(doc)], agent="kpi")
         assert result["agent_used"] == "kpi"
         assert "TestCo" in result["response"]
 
 
 class TestKPIAgent:
     @patch("src.agents.kpi_agent.completion")
-    def test_extract_kpis_returns_structured_data(self, mock_completion):
+    def test_extract_kpis_returns_structured_data(self, mock_completion, tmp_path):
+        doc = tmp_path / "doc.md"
+        doc.write_text("# TechCorp\nRevenue: 145.2M", encoding="utf-8")
         kpi_json = json.dumps({
             "company": "TechCorp",
             "period": "Q1 2025",
@@ -93,19 +97,21 @@ class TestKPIAgent:
         mock_completion.return_value.choices = [MagicMock()]
         mock_completion.return_value.choices[0].message.content = kpi_json
 
-        result = extract_kpis("What are the KPIs?", ["/doc.md"])
+        result = extract_kpis("What are the KPIs?", [str(doc)])
 
         assert result["company"] == "TechCorp"
         assert len(result["kpis"]) == 2
         assert result["kpis"][0]["metric"] == "Revenue"
 
     @patch("src.agents.kpi_agent.completion")
-    def test_extract_kpis_handles_code_fences(self, mock_completion):
+    def test_extract_kpis_handles_code_fences(self, mock_completion, tmp_path):
+        doc = tmp_path / "doc.md"
+        doc.write_text("# Test\nData", encoding="utf-8")
         kpi_json = '```json\n{"company": "Test", "period": "FY", "kpis": []}\n```'
         mock_completion.return_value.choices = [MagicMock()]
         mock_completion.return_value.choices[0].message.content = kpi_json
 
-        result = extract_kpis("KPIs?", ["/doc.md"])
+        result = extract_kpis("KPIs?", [str(doc)])
         assert result["company"] == "Test"
 
     def test_extract_kpis_no_documents(self):
@@ -136,11 +142,13 @@ class TestKPIAgent:
 
 class TestInsightAgent:
     @patch("src.agents.insight_agent.completion")
-    def test_generate_insights_returns_text(self, mock_completion):
+    def test_generate_insights_returns_text(self, mock_completion, tmp_path):
+        doc = tmp_path / "doc.md"
+        doc.write_text("# Company\nRevenue: 100M", encoding="utf-8")
         mock_completion.return_value.choices = [MagicMock()]
         mock_completion.return_value.choices[0].message.content = "## Analysis\nRevenue is strong."
 
-        result = generate_insights("Analyse trends", ["/doc.md"])
+        result = generate_insights("Analyse trends", [str(doc)])
         assert "Revenue" in result
 
     def test_generate_insights_no_documents(self):
@@ -150,11 +158,13 @@ class TestInsightAgent:
 
 class TestBriefingAgent:
     @patch("src.agents.briefing_agent.completion")
-    def test_generate_briefing_returns_text(self, mock_completion):
+    def test_generate_briefing_returns_text(self, mock_completion, tmp_path):
+        doc = tmp_path / "doc.md"
+        doc.write_text("# Company\nPerformance is strong.", encoding="utf-8")
         mock_completion.return_value.choices = [MagicMock()]
         mock_completion.return_value.choices[0].message.content = "## Executive Summary\nCompany is doing well."
 
-        result = generate_briefing("Brief me", ["/doc.md"])
+        result = generate_briefing("Brief me", [str(doc)])
         assert "Executive Summary" in result or "Company" in result
 
     def test_generate_briefing_no_documents(self):

@@ -61,8 +61,9 @@ class TestGenerator:
 
         generate_response("Query?", [str(doc_path)])
 
+        from config.settings import settings
         call_kwargs = mock_completion.call_args.kwargs
-        assert "claude" in call_kwargs["model"].lower() or "anthropic" in call_kwargs["model"].lower()
+        assert call_kwargs["model"] == settings.high_capacity_llm_model
 
     @patch("src.generator.completion")
     def test_generate_response_combines_multiple_docs(self, mock_completion, tmp_path):

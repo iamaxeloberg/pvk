@@ -41,6 +41,5 @@ jobs:
           pip install pytest pytest-cov
           pip install pydantic pydantic-settings python-dotenv fastapi uvicorn
       - name: Run tests
-        working-directory: quantera
         run: |
           python -m pytest tests/ -v --cov=src --cov-report=term-missing

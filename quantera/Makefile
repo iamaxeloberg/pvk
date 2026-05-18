@@ -1,3 +1,5 @@
+PYTHON := venv/bin/python3
+
 .PHONY: help install ingest query list seed test lint format clean serve
 
 help:
@@ -21,40 +23,40 @@ help:
 	@echo "  make clean            Remove generated files"
 
 install:
-	python3 -m pip install -e ".[dev]"
+	$(PYTHON) -m pip install -e ".[dev]"
 
 install-vector:
-	python3 -m pip install -e ".[dev,vector]"
+	$(PYTHON) -m pip install -e ".[dev,vector]"
 
 serve:
-	python3 -m uvicorn src.web:app --reload --host 0.0.0.0 --port 8000
+	$(PYTHON) -m uvicorn src.web:app --reload --host 0.0.0.0 --port 8000
 
 ingest:
-	python3 src/api.py ingest
+	$(PYTHON) src/api.py ingest
 
 query:
 ifndef Q
 	$(error Q is required. Usage: make query Q='your question')
 endif
-	python3 src/api.py query "$(Q)"
+	$(PYTHON) src/api.py query "$(Q)"
 
 list:
-	python3 src/api.py list
+	$(PYTHON) src/api.py list
 
 seed:
-	python3 scripts/seed_test_data.py
+	$(PYTHON) scripts/seed_test_data.py
 
 classify:
 ifndef Q
 	$(error Q is required. Usage: make classify Q='your question')
 endif
-	python3 src/api.py classify "$(Q)"
+	$(PYTHON) src/api.py classify "$(Q)"
 
 kpi:
 ifndef COMPANY
 	$(error COMPANY is required. Usage: make kpi COMPANY='TechCorp')
 endif
-	python3 src/api.py kpi "$(COMPANY)"
+	$(PYTHON) src/api.py kpi "$(COMPANY)"
 
 kpi-metric:
 ifndef COMPANY
@@ -63,22 +65,22 @@ endif
 ifndef METRIC
 	$(error METRIC is required. Usage: make kpi-metric COMPANY='TechCorp' METRIC='Revenue')
 endif
-	python3 src/api.py kpi "$(COMPANY)" "$(METRIC)"
+	$(PYTHON) src/api.py kpi "$(COMPANY)" "$(METRIC)"
 
 validate:
 ifndef LABELS
 	$(error LABELS is required. Usage: make validate LABELS=path/to/labels.json)
 endif
-	python3 scripts/validate_categorisation.py --labels "$(LABELS)"
+	$(PYTHON) scripts/validate_categorisation.py --labels "$(LABELS)"
 
 test:
-	python3 -m pytest tests/ -v
+	$(PYTHON) -m pytest tests/ -v
 
 lint:
-	python3 -m ruff check .
+	$(PYTHON) -m ruff check .
 
 format:
-	python3 -m ruff format .
+	$(PYTHON) -m ruff format .
 
 clean:
 	rm -rf __pycache__ */__pycache__ .pytest_cache logs/

@@ -78,7 +78,7 @@ class TestAssessmentReport:
 
     def test_summary_contains_stats(self):
         results = [
-            AssessmentResult("q1", "exp", "act", "kpi", overall_score=0.8, feedback="Good"),
+            AssessmentResult("q1", "exp", "act", "kpi", factual_accuracy=0.8, overall_score=0.8, feedback="Good"),
         ]
         report = AssessmentReport(results=results)
         summary = report.summary()
