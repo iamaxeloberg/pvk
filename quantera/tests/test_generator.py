@@ -32,7 +32,7 @@ class TestGenerator:
         response = generate_response("Query?", [str(doc_path)])
         assert "No relevant documents" in response
 
-    @patch("src.generator.completion")
+    @patch("src.generator.llm_completion")
     def test_generate_response_with_mock(self, mock_completion, tmp_path):
         """Test response generation using mocked LLM."""
         doc_path = tmp_path / "test.md"
@@ -48,7 +48,7 @@ class TestGenerator:
         assert "145.2M" in result
         mock_completion.assert_called_once()
 
-    @patch("src.generator.completion")
+    @patch("src.generator.llm_completion")
     def test_generate_response_uses_correct_model(self, mock_completion, tmp_path):
         """Test that the high-capacity LLM model is used."""
         doc_path = tmp_path / "test.md"
@@ -65,7 +65,7 @@ class TestGenerator:
         call_kwargs = mock_completion.call_args.kwargs
         assert call_kwargs["model"] == settings.high_capacity_llm_model
 
-    @patch("src.generator.completion")
+    @patch("src.generator.llm_completion")
     def test_generate_response_combines_multiple_docs(self, mock_completion, tmp_path):
         """Test that multiple documents are combined in the prompt."""
         doc1 = tmp_path / "doc1.md"

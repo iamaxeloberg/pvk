@@ -2,30 +2,25 @@
 
 import logging
 from pathlib import Path
-from litellm import completion
 from config.settings import settings
-from src.utils import read_prompt, get_llm_content
+from src.utils import read_prompt, get_llm_content, llm_completion
 
 logger = logging.getLogger(__name__)
 
 
 def generate_briefing(user_query: str, relevant_documents: list[str]) -> str:
-    """Generate an executive briefing from relevant documents.
-
-    Args:
-        user_query: The user's query (e.g. "How is Company X doing?")
-        relevant_documents: List of Markdown file paths to synthesise
-
-    Returns:
-        Executive briefing as a formatted string
-    """
+    """Generate an executive briefing from relevant documents."""
     prompt = read_prompt("executive_briefing")
 
     doc_contents = []
     for doc_path in relevant_documents:
         path = Path(doc_path)
         if path.exists():
-            content = path.read_text(encoding="utf-8")
+            try:
+                content = path.read_text(encoding="utf-8")
+            except (UnicodeDecodeError, PermissionError, OSError) as e:
+                logger.warning(f"Could not read {doc_path}: {e}")
+                continue
             if len(content) > settings.max_doc_size_chars:
                 content = content[: settings.max_doc_size_chars] + "\n\n[Document truncated due to size...]"
             doc_contents.append(f"--- Document: {path.name} ---\n{content}")
@@ -42,7 +37,8 @@ def generate_briefing(user_query: str, relevant_documents: list[str]) -> str:
         {"role": "user", "content": f"Create an executive briefing based on these documents:\n\n{combined_docs}\n\nQuery: {user_query}"},
     ]
 
-    response = completion(
+    logger.info("Generating executive briefing via LLM...")
+    response = llm_completion(
         model=settings.high_capacity_llm_model,
         messages=messages,
         api_key=settings.high_capacity_llm_api_key or None,

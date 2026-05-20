@@ -4,9 +4,8 @@ import json
 import logging
 import sqlite3
 from pathlib import Path
-from litellm import completion
 from config.settings import settings
-from src.utils import read_prompt, get_llm_content
+from src.utils import read_prompt, get_llm_content, llm_completion, safe_parse_llm_json
 
 logger = logging.getLogger(__name__)
 
@@ -49,7 +48,8 @@ def extract_kpis(
         {"role": "user", "content": f"Extract all financial KPIs from these documents:\n\n{combined_docs}\n\nUser query: {user_query}"},
     ]
 
-    response = completion(
+    logger.info("Extracting KPIs via LLM...")
+    response = llm_completion(
         model=settings.high_capacity_llm_model,
         messages=messages,
         api_key=settings.high_capacity_llm_api_key or None,
@@ -60,30 +60,23 @@ def extract_kpis(
 
     result_text = get_llm_content(response)
 
-    parts = result_text.split("```")
-    if len(parts) > 1:
-        result_text = parts[1]
-        if result_text.startswith("json"):
-            result_text = result_text[4:]
-    result_text = result_text.strip()
+    parsed = safe_parse_llm_json(result_text)
 
-    try:
-        parsed = json.loads(result_text)
-        # Model may return a list of objects instead of a single object
-        kpis = parsed[0] if isinstance(parsed, list) and parsed else parsed
-        logger.info(f"Extracted {len(kpis.get('kpis', []))} KPIs for query: {user_query}")
+    if "error" in parsed:
+        logger.error(f"Failed to parse KPI JSON: {parsed['error']}")
+        return {"company": "", "period": "", "kpis": [], "error": f"Failed to parse KPI data: {parsed['error']}"}
 
-        if db_conn is not None:
-            from src.kpi_store import store_kpis
+    kpis = parsed[0] if isinstance(parsed, list) and parsed else parsed
+    logger.info(f"Extracted {len(kpis.get('kpis', []))} KPIs for query: {user_query}")
 
-            source = relevant_documents[0] if relevant_documents else ""
-            stored = store_kpis(db_conn, kpis, source)
-            kpis["kpis_stored"] = stored
+    if db_conn is not None:
+        from src.kpi_store import store_kpis
 
-        return kpis
-    except json.JSONDecodeError as e:
-        logger.error(f"Failed to parse KPI JSON: {e}")
-        return {"company": "", "period": "", "kpis": [], "error": f"Failed to parse KPI data: {e}"}
+        source = relevant_documents[0] if relevant_documents else ""
+        stored = store_kpis(db_conn, kpis, source)
+        kpis["kpis_stored"] = stored
+
+    return kpis
 
 
 def format_kpi_response(kpi_data: dict) -> str:

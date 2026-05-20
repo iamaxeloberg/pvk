@@ -2,23 +2,14 @@
 
 import logging
 from pathlib import Path
-from litellm import completion
 from config.settings import settings
-from src.utils import read_prompt, get_llm_content
+from src.utils import read_prompt, get_llm_content, llm_completion
 
 logger = logging.getLogger(__name__)
 
 
 def retrieve_relevant_docs(conn, user_query: str) -> list[str]:
-    """Use low-cost LLM to filter the index and return relevant file paths.
-
-    Args:
-        conn: SQLite connection
-        user_query: The original user query
-
-    Returns:
-        List of Markdown file paths that are relevant to the query
-    """
+    """Use low-cost LLM to filter the index and return relevant file paths."""
     index_context = build_index_context(conn)
     prompt = read_prompt("retrieval")
 
@@ -27,7 +18,7 @@ def retrieve_relevant_docs(conn, user_query: str) -> list[str]:
         {"role": "user", "content": f"Document Index:\n{index_context}\n\nUser Query: {user_query}\n\nReturn the file paths of relevant documents:"},
     ]
 
-    response = completion(
+    response = llm_completion(
         model=settings.low_cost_llm_model,
         messages=messages,
         api_key=settings.low_cost_llm_api_key or None,

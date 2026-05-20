@@ -1,4 +1,4 @@
-PYTHON := venv/bin/python3
+PYTHON := .venv/bin/python3
 
 .PHONY: help install ingest query list seed test lint format clean serve
 
@@ -29,7 +29,7 @@ install-vector:
 	$(PYTHON) -m pip install -e ".[dev,vector]"
 
 serve:
-	$(PYTHON) -m uvicorn src.web:app --reload --host 0.0.0.0 --port 8000
+	$(PYTHON) -m uvicorn src.web:app --host 0.0.0.0 --port 8000
 
 ingest:
 	$(PYTHON) src/api.py ingest

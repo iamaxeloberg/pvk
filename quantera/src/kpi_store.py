@@ -48,6 +48,9 @@ def _period_sort_key(period: str) -> tuple:
 def init_kpi_table(db_path: Path | None = None) -> sqlite3.Connection:
     """Initialise the KPI store table in the database."""
     conn = sqlite3.connect(str(db_path or settings.db_path_obj))
+    conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA journal_mode=WAL")
+    conn.execute("PRAGMA busy_timeout=5000")
     conn.execute("""
         CREATE TABLE IF NOT EXISTS kpi_store (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -140,13 +143,13 @@ def get_kpi_trend(
     rows = cursor.fetchall()
     results = [
         {
-            "period": r[0],
-            "value": r[1],
-            "value_raw": r[2],
-            "unit": r[3],
-            "context": r[4],
-            "source_file": r[5],
-            "extracted_at": r[6],
+            "period": r["period"],
+            "value": r["value"],
+            "value_raw": r["value_raw"],
+            "unit": r["unit"],
+            "context": r["context"],
+            "source_file": r["source_file"],
+            "extracted_at": r["extracted_at"],
         }
         for r in rows
     ]
@@ -173,16 +176,17 @@ def get_all_kpis_for_company(conn: sqlite3.Connection, company: str) -> dict[str
     rows = cursor.fetchall()
 
     grouped: dict[str, list[dict]] = {}
-    for metric, period, value, value_raw, unit, context, source in rows:
+    for row in rows:
+        metric = row["metric"]
         if metric not in grouped:
             grouped[metric] = []
         grouped[metric].append({
-            "period": period,
-            "value": value,
-            "value_raw": value_raw,
-            "unit": unit,
-            "context": context,
-            "source_file": source,
+            "period": row["period"],
+            "value": row["value"],
+            "value_raw": row["value_raw"],
+            "unit": row["unit"],
+            "context": row["context"],
+            "source_file": row["source_file"],
         })
 
     for entries in grouped.values():
@@ -194,13 +198,13 @@ def get_all_kpis_for_company(conn: sqlite3.Connection, company: str) -> dict[str
 def get_companies_with_kpis(conn: sqlite3.Connection) -> list[str]:
     """Get list of unique companies that have stored KPIs."""
     cursor = conn.execute("SELECT DISTINCT company FROM kpi_store ORDER BY company")
-    return [r[0] for r in cursor.fetchall()]
+    return [r["company"] for r in cursor.fetchall()]
 
 
 def get_available_metrics(conn: sqlite3.Connection) -> list[str]:
     """Get list of unique metrics in the KPI store."""
     cursor = conn.execute("SELECT DISTINCT metric FROM kpi_store ORDER BY metric")
-    return [r[0] for r in cursor.fetchall()]
+    return [r["metric"] for r in cursor.fetchall()]
 
 
 def delete_kpis_for_company(conn: sqlite3.Connection, company: str) -> int:

@@ -1,9 +1,8 @@
 """AI Picker / Agent Router - Classifies queries and routes to the appropriate sub-agent."""
 
 import logging
-from litellm import completion
+from src.utils import read_prompt, get_llm_content, llm_completion
 from config.settings import settings
-from src.utils import read_prompt, get_llm_content
 
 logger = logging.getLogger(__name__)
 
@@ -26,7 +25,7 @@ def classify_query(user_query: str) -> str:
         {"role": "user", "content": user_query},
     ]
 
-    response = completion(
+    response = llm_completion(
         model=settings.low_cost_llm_model,
         messages=messages,
         api_key=settings.low_cost_llm_api_key or None,

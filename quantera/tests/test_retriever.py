@@ -43,7 +43,7 @@ class TestRetriever:
         """Full retrieval test requires LLM API."""
         pytest.skip("Requires LLM API configuration")
 
-    @patch("src.retriever.completion")
+    @patch("src.retriever.llm_completion")
     def test_retrieve_relevant_docs_with_mock(self, mock_completion, db_conn):
         """Test retrieval using mocked LLM response."""
         mock_response = MagicMock()
@@ -57,7 +57,7 @@ class TestRetriever:
         assert "/data/techcorp.md" in result
         mock_completion.assert_called_once()
 
-    @patch("src.retriever.completion")
+    @patch("src.retriever.llm_completion")
     def test_retrieve_filters_invalid_paths(self, mock_completion, db_conn):
         """Test that paths not in the database are filtered out."""
         mock_response = MagicMock()
@@ -71,7 +71,7 @@ class TestRetriever:
         assert "/data/techcorp.md" in result
         assert "/data/nonexistent.md" not in result
 
-    @patch("src.retriever.completion")
+    @patch("src.retriever.llm_completion")
     def test_retrieve_handles_empty_response(self, mock_completion, db_conn):
         """Test handling of empty LLM response."""
         mock_response = MagicMock()
@@ -83,7 +83,7 @@ class TestRetriever:
 
         assert result == []
 
-    @patch("src.retriever.completion")
+    @patch("src.retriever.llm_completion")
     def test_retrieve_handles_multiple_paths(self, mock_completion, db_conn):
         """Test retrieval returning multiple valid documents."""
         mock_response = MagicMock()

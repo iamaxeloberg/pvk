@@ -1,28 +1,17 @@
 """Low-cost LLM metadata extraction (DP3-DP4) - extracts company name and categories."""
 
-import json
 import logging
 from pathlib import Path
-from litellm import completion
 from config.settings import settings
-from src.utils import read_prompt, get_llm_content
+from src.utils import read_prompt, get_llm_content, llm_completion, safe_parse_llm_json
 
 logger = logging.getLogger(__name__)
 
 
 def extract_metadata(markdown_content: str, markdown_path: Path) -> dict:
-    """Use low-cost LLM to extract company, categories, and file path from Markdown.
-
-    Args:
-        markdown_content: The Markdown text to analyse
-        markdown_path: Path to the Markdown file
-
-    Returns:
-        Dict with keys: company, categories, markdown_file_path
-    """
+    """Use low-cost LLM to extract company, categories, and file path from Markdown."""
     prompt = read_prompt("categorisation")
 
-    # Truncate very long documents to control token costs
     max_chars = 8000
     if len(markdown_content) > max_chars:
         content = markdown_content[:max_chars] + "\n\n[Document truncated for analysis...]"
@@ -34,7 +23,7 @@ def extract_metadata(markdown_content: str, markdown_path: Path) -> dict:
         {"role": "user", "content": f"Analyse this document and extract metadata:\n\n{content}"},
     ]
 
-    response = completion(
+    response = llm_completion(
         model=settings.low_cost_llm_model,
         messages=messages,
         api_key=settings.low_cost_llm_api_key or None,
@@ -44,23 +33,12 @@ def extract_metadata(markdown_content: str, markdown_path: Path) -> dict:
     )
 
     result_text = get_llm_content(response)
+    metadata = safe_parse_llm_json(result_text)
 
-    # Parse JSON from response (handle potential markdown code blocks)
-    parts = result_text.split("```")
-    if len(parts) > 1:
-        result_text = parts[1]
-        if result_text.startswith("json"):
-            result_text = result_text[4:]
-    result_text = result_text.strip()
+    if "error" in metadata:
+        logger.error(f"Failed to parse categorisation metadata: {metadata['error']}")
+        return {"company": "Unknown", "categories": ["Uncategorised"], "markdown_file_path": str(markdown_path)}
 
-    try:
-        metadata = json.loads(result_text)
-    except json.JSONDecodeError as e:
-        logger.error(f"Failed to parse categorisation JSON: {e}")
-        raise ValueError(f"LLM returned malformed JSON: {result_text[:200]}") from e
-
-    # Ensure markdown_file_path is set correctly
     metadata["markdown_file_path"] = str(markdown_path)
-
     logger.info(f"Extracted metadata: {metadata}")
     return metadata

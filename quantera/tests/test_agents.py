@@ -16,7 +16,7 @@ from src.agents.briefing_agent import generate_briefing
 
 
 class TestAgentRouter:
-    @patch("src.agents.router.completion")
+    @patch("src.agents.router.llm_completion")
     def test_classify_kpi_query(self, mock_completion):
         mock_completion.return_value.choices = [MagicMock()]
         mock_completion.return_value.choices[0].message.content = "kpi"
@@ -24,7 +24,7 @@ class TestAgentRouter:
         result = classify_query("What was TechCorp's revenue in Q1?")
         assert result == "kpi"
 
-    @patch("src.agents.router.completion")
+    @patch("src.agents.router.llm_completion")
     def test_classify_insight_query(self, mock_completion):
         mock_completion.return_value.choices = [MagicMock()]
         mock_completion.return_value.choices[0].message.content = "insight"
@@ -32,7 +32,7 @@ class TestAgentRouter:
         result = classify_query("Analyse the profitability trends")
         assert result == "insight"
 
-    @patch("src.agents.router.completion")
+    @patch("src.agents.router.llm_completion")
     def test_classify_briefing_query(self, mock_completion):
         mock_completion.return_value.choices = [MagicMock()]
         mock_completion.return_value.choices[0].message.content = "briefing"
@@ -40,7 +40,7 @@ class TestAgentRouter:
         result = classify_query("Give me a briefing on Nordic Retail")
         assert result == "briefing"
 
-    @patch("src.agents.router.completion")
+    @patch("src.agents.router.llm_completion")
     def test_classify_general_query(self, mock_completion):
         mock_completion.return_value.choices = [MagicMock()]
         mock_completion.return_value.choices[0].message.content = "general"
@@ -48,7 +48,7 @@ class TestAgentRouter:
         result = classify_query("What documents do we have?")
         assert result == "general"
 
-    @patch("src.agents.router.completion")
+    @patch("src.agents.router.llm_completion")
     def test_classify_invalid_agent_defaults_to_general(self, mock_completion):
         mock_completion.return_value.choices = [MagicMock()]
         mock_completion.return_value.choices[0].message.content = "invalid_agent"
@@ -56,7 +56,7 @@ class TestAgentRouter:
         result = classify_query("test query")
         assert result == "general"
 
-    @patch("src.agents.router.completion")
+    @patch("src.agents.router.llm_completion")
     def test_classify_handles_whitespace(self, mock_completion):
         mock_completion.return_value.choices = [MagicMock()]
         mock_completion.return_value.choices[0].message.content = "  KPI  "
@@ -64,7 +64,7 @@ class TestAgentRouter:
         result = classify_query("test query")
         assert result == "kpi"
 
-    @patch("src.agents.kpi_agent.completion")
+    @patch("src.agents.kpi_agent.llm_completion")
     def test_route_with_explicit_kpi_agent(self, mock_completion, tmp_path):
         """Test that passing agent='kpi' routes to the KPI agent."""
         doc = tmp_path / "doc.md"
@@ -82,7 +82,7 @@ class TestAgentRouter:
 
 
 class TestKPIAgent:
-    @patch("src.agents.kpi_agent.completion")
+    @patch("src.agents.kpi_agent.llm_completion")
     def test_extract_kpis_returns_structured_data(self, mock_completion, tmp_path):
         doc = tmp_path / "doc.md"
         doc.write_text("# TechCorp\nRevenue: 145.2M", encoding="utf-8")
@@ -103,7 +103,7 @@ class TestKPIAgent:
         assert len(result["kpis"]) == 2
         assert result["kpis"][0]["metric"] == "Revenue"
 
-    @patch("src.agents.kpi_agent.completion")
+    @patch("src.agents.kpi_agent.llm_completion")
     def test_extract_kpis_handles_code_fences(self, mock_completion, tmp_path):
         doc = tmp_path / "doc.md"
         doc.write_text("# Test\nData", encoding="utf-8")
@@ -141,7 +141,7 @@ class TestKPIAgent:
 
 
 class TestInsightAgent:
-    @patch("src.agents.insight_agent.completion")
+    @patch("src.agents.insight_agent.llm_completion")
     def test_generate_insights_returns_text(self, mock_completion, tmp_path):
         doc = tmp_path / "doc.md"
         doc.write_text("# Company\nRevenue: 100M", encoding="utf-8")
@@ -157,7 +157,7 @@ class TestInsightAgent:
 
 
 class TestBriefingAgent:
-    @patch("src.agents.briefing_agent.completion")
+    @patch("src.agents.briefing_agent.llm_completion")
     def test_generate_briefing_returns_text(self, mock_completion, tmp_path):
         doc = tmp_path / "doc.md"
         doc.write_text("# Company\nPerformance is strong.", encoding="utf-8")
@@ -173,8 +173,8 @@ class TestBriefingAgent:
 
 
 class TestAgentIntegration:
-    @patch("src.agents.router.completion")
-    @patch("src.agents.kpi_agent.completion")
+    @patch("src.agents.router.llm_completion")
+    @patch("src.agents.kpi_agent.llm_completion")
     def test_full_kpi_route(self, mock_kpi, mock_router, tmp_path):
         doc = tmp_path / "test.md"
         doc.write_text("# TechCorp\nRevenue: 100M", encoding="utf-8")

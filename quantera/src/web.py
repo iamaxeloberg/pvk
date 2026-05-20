@@ -2,11 +2,13 @@
 
 import logging
 import sys
+from contextlib import contextmanager
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from fastapi import FastAPI, HTTPException
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 from src.ingestion import get_input_files
@@ -26,7 +28,8 @@ from src.generator import generate_response
 from src.agents.router import route_query, classify_query, VALID_AGENTS
 from src.agents.kpi_agent import extract_kpis, format_kpi_response
 from src.kpi_store import init_kpi_table, get_kpi_trend, get_all_kpis_for_company, get_companies_with_kpis, get_available_metrics
-from src.utils import setup_logging
+from src.vector_search import init_vector_table, semantic_search, has_embeddings
+from src.utils import setup_logging, validate_config, ensure_dir
 from config.settings import settings
 
 setup_logging()
@@ -37,6 +40,33 @@ app = FastAPI(
     description="AI-driven financial document indexing and query system",
     version="0.1.0",
 )
+
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request, exc):
+    logger.error(f"Unhandled error: {exc}", exc_info=True)
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "Internal server error. Check server logs for details."},
+    )
+
+
+@contextmanager
+def get_db():
+    conn = init_db()
+    try:
+        yield conn
+    finally:
+        close_db(conn)
+
+
+@contextmanager
+def get_kpi_db():
+    conn = init_kpi_table()
+    try:
+        yield conn
+    finally:
+        close_db(conn)
 
 
 class QueryRequest(BaseModel):
@@ -95,9 +125,24 @@ class DocumentListResponse(BaseModel):
     documents: list[DocumentInfo]
 
 
+@app.on_event("startup")
+async def startup_checks():
+    logger.info("Quantera server starting up...")
+    ensure_dir(Path(settings.input_dir))
+    ensure_dir(Path(settings.markdown_dir))
+    ensure_dir(Path(settings.db_path).parent)
+
+    warnings = validate_config()
+    if warnings:
+        for w in warnings:
+            logger.warning(f"Config warning: {w}")
+    else:
+        logger.info("All configuration validated successfully.")
+
+
 @app.get("/health")
 def health_check():
-    return {"status": "ok"}
+    return {"status": "ok", "version": "0.1.0"}
 
 
 @app.post("/ingest", response_model=IngestResponse)
@@ -121,8 +166,7 @@ def run_ingestion():
                 conversion_failures.append(f"{fp.name}: {e}")
                 logger.error(f"Failed to convert {fp}: {e}")
 
-    conn = init_db()
-    try:
+    with get_db() as conn:
         indexed = 0
         index_skipped = 0
         indexing_failures = []
@@ -142,8 +186,6 @@ def run_ingestion():
                 logger.error(f"Failed to index {md_path}: {e}")
 
         count = get_document_count(conn)
-    finally:
-        close_db(conn)
 
     return IngestResponse(
         total_input=len(input_files),
@@ -159,17 +201,27 @@ def run_ingestion():
 
 @app.post("/query", response_model=QueryResponse)
 def query_documents(request: QueryRequest):
-    """Query indexed documents using the AI agent router."""
-    conn = init_db()
-    try:
+    """Query indexed documents using the AI agent router with semantic search."""
+    with get_db() as conn:
         count = get_document_count(conn)
         if count == 0:
-            raise HTTPException(status_code=404, detail="No documents indexed. Run the ingestion pipeline first.")
+            raise HTTPException(status_code=409, detail="No documents indexed. Run the ingestion pipeline first.")
 
-        try:
-            relevant_paths = retrieve_relevant_docs(conn, request.question)
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Retrieval error: {e}")
+        relevant_paths = []
+        if has_embeddings(conn):
+            with get_db() as vector_conn:
+                try:
+                    results = semantic_search(vector_conn, request.question, top_k=5)
+                except Exception:
+                    results = []
+            if results:
+                relevant_paths = [path for path, _score in results]
+
+        if not relevant_paths:
+            try:
+                relevant_paths = retrieve_relevant_docs(conn, request.question)
+            except Exception as e:
+                raise HTTPException(status_code=500, detail=f"Retrieval error: {e}")
 
         if not relevant_paths:
             return QueryResponse(question=request.question, answer="No relevant documents found.", agent_used="general", relevant_documents=[])
@@ -189,57 +241,65 @@ def query_documents(request: QueryRequest):
             agent_used=result.get("agent_used", "unknown"),
             relevant_documents=result.get("relevant_documents", []),
         )
-    finally:
-        close_db(conn)
 
 
 @app.post("/classify", response_model=ClassifyResponse)
 def classify_question(request: QueryRequest):
     """Classify a query to determine which sub-agent should handle it."""
-    agent = classify_query(request.question)
+    try:
+        agent = classify_query(request.question)
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=f"Classifier unavailable: {e}")
     return ClassifyResponse(question=request.question, recommended_agent=agent)
 
 
 @app.get("/kpi/companies", response_model=KPIListResponse)
 def list_kpi_companies():
     """List companies and metrics with stored KPI data."""
-    kpi_conn = init_kpi_table()
-    companies = get_companies_with_kpis(kpi_conn)
-    metrics = get_available_metrics(kpi_conn)
-    close_db(kpi_conn)
-    return KPIListResponse(companies=companies, metrics=metrics)
+    try:
+        with get_kpi_db() as kpi_conn:
+            companies = get_companies_with_kpis(kpi_conn)
+            metrics = get_available_metrics(kpi_conn)
+        return KPIListResponse(companies=companies, metrics=metrics)
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=f"KPI database error: {e}")
 
 
 @app.get("/kpi/{company}", response_model=KPICompanyResponse)
 def get_company_kpis(company: str):
     """Get all KPIs for a company."""
-    kpi_conn = init_kpi_table()
-    kpis = get_all_kpis_for_company(kpi_conn, company)
-    close_db(kpi_conn)
-    return KPICompanyResponse(company=company, kpis=kpis)
+    try:
+        with get_kpi_db() as kpi_conn:
+            kpis = get_all_kpis_for_company(kpi_conn, company)
+        return KPICompanyResponse(company=company, kpis=kpis)
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=f"KPI database error: {e}")
 
 
 @app.get("/kpi/{company}/{metric}", response_model=KPITrendResponse)
 def get_kpi_trend_endpoint(company: str, metric: str):
     """Get time-series KPI data for a company and specific metric."""
-    kpi_conn = init_kpi_table()
-    trend = get_kpi_trend(kpi_conn, company, metric)
-    close_db(kpi_conn)
-    return KPITrendResponse(company=company, metric=metric, data=trend)
+    try:
+        with get_kpi_db() as kpi_conn:
+            trend = get_kpi_trend(kpi_conn, company, metric)
+        return KPITrendResponse(company=company, metric=metric, data=trend)
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=f"KPI database error: {e}")
 
 
 @app.get("/documents", response_model=DocumentListResponse)
 def list_documents():
     """List all indexed documents."""
-    conn = init_db()
-    docs = get_all_documents(conn)
-    count = len(docs)
-    close_db(conn)
-
-    return DocumentListResponse(
-        total=count,
-        documents=[DocumentInfo(**doc) for doc in docs],
-    )
+    try:
+        with get_db() as conn:
+            docs = get_all_documents(conn)
+            count = len(docs)
+        return DocumentListResponse(
+            total=count,
+            documents=[DocumentInfo(**doc) for doc in docs],
+        )
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=f"Document database error: {e}")
 
 
 @app.delete("/documents/{markdown_path:path}")
@@ -248,11 +308,11 @@ def delete_doc(markdown_path: str):
     if ".." in markdown_path:
         raise HTTPException(status_code=400, detail="Path traversal not allowed")
 
-    conn = init_db()
     try:
-        deleted = delete_document(conn, markdown_path)
-    finally:
-        close_db(conn)
+        with get_db() as conn:
+            deleted = delete_document(conn, markdown_path)
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=f"Database error: {e}")
 
     if not deleted:
         raise HTTPException(status_code=404, detail=f"Document not found: {markdown_path}")

@@ -35,6 +35,8 @@ def _to_markdown_table(headers: list[str], rows: list[list[str]]) -> str:
 
 def convert_excel(file_path: Path, output_dir: Path | None = None) -> Path:
     """Convert an Excel file (.xlsx/.xls) to Markdown tables per sheet."""
+    if not file_path.exists():
+        raise FileNotFoundError(f"Excel file not found: {file_path}")
     import openpyxl
 
     output_dir = output_dir or settings.markdown_dir_obj
@@ -55,7 +57,8 @@ def convert_excel(file_path: Path, output_dir: Path | None = None) -> Path:
         sections.append(_to_markdown_table(headers, data_rows))
         sections.append("")
 
-    md_filename = file_path.stem + ".md"
+    suffix = file_path.suffix.lstrip(".")
+    md_filename = f"{file_path.stem}_{suffix}.md"
     md_path = output_dir / md_filename
     md_path.write_text("\n".join(sections), encoding="utf-8")
     logger.info(f"Markdown saved to {md_path}")
@@ -64,14 +67,24 @@ def convert_excel(file_path: Path, output_dir: Path | None = None) -> Path:
 
 def convert_csv_file(file_path: Path, output_dir: Path | None = None) -> Path:
     """Convert a CSV file to a Markdown table."""
+    if not file_path.exists():
+        raise FileNotFoundError(f"CSV file not found: {file_path}")
     output_dir = output_dir or settings.markdown_dir_obj
     output_dir.mkdir(parents=True, exist_ok=True)
 
     logger.info(f"Converting CSV file {file_path} to Markdown...")
 
-    with open(file_path, encoding="utf-8") as f:
-        reader = csv.reader(f)
-        rows = list(reader)
+    rows = None
+    for enc in ("utf-8", "latin-1", "utf-8-sig"):
+        try:
+            with open(file_path, encoding=enc) as f:
+                reader = csv.reader(f)
+                rows = list(reader)
+            break
+        except UnicodeDecodeError:
+            continue
+    if rows is None:
+        raise ValueError(f"Unable to decode CSV: {file_path}")
 
     if not rows:
         md_content = f"# {file_path.stem}\n\n*Empty file*\n"
@@ -80,7 +93,8 @@ def convert_csv_file(file_path: Path, output_dir: Path | None = None) -> Path:
         data_rows = rows[1:]
         md_content = f"# {file_path.stem}\n\n{_to_markdown_table(headers, data_rows)}\n"
 
-    md_filename = file_path.stem + ".md"
+    suffix = file_path.suffix.lstrip(".")
+    md_filename = f"{file_path.stem}_{suffix}.md"
     md_path = output_dir / md_filename
     md_path.write_text(md_content, encoding="utf-8")
     logger.info(f"Markdown saved to {md_path}")
@@ -113,6 +127,8 @@ def convert_to_markdown(file_path: Path, output_dir: Path | None = None) -> Path
 
 def _convert_pdf(file_path: Path, output_dir: Path | None = None) -> Path:
     """Convert a PDF file to Markdown using Marker."""
+    if not file_path.exists():
+        raise FileNotFoundError(f"PDF file not found: {file_path}")
     from marker.converters.pdf import PdfConverter
     from marker.output import text_from_rendered
 
@@ -125,7 +141,8 @@ def _convert_pdf(file_path: Path, output_dir: Path | None = None) -> Path:
     rendered = converter(str(file_path))
     text, _, _ = text_from_rendered(rendered)
 
-    md_filename = file_path.stem + ".md"
+    suffix = file_path.suffix.lstrip(".")
+    md_filename = f"{file_path.stem}_{suffix}.md"
     md_path = output_dir / md_filename
     md_path.write_text(text, encoding="utf-8")
 

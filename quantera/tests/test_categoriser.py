@@ -28,7 +28,7 @@ class TestCategoriser:
         # This test requires a working LLM API, so we skip it in CI
         pytest.skip("Requires LLM API configuration")
 
-    @patch("src.categoriser.completion")
+    @patch("src.categoriser.llm_completion")
     def test_extract_metadata_with_mock(self, mock_completion):
         """Test metadata extraction using mocked LLM response."""
         mock_response = MagicMock()
@@ -46,7 +46,7 @@ class TestCategoriser:
         assert result["markdown_file_path"] == str(md_path)
         mock_completion.assert_called_once()
 
-    @patch("src.categoriser.completion")
+    @patch("src.categoriser.llm_completion")
     def test_extract_metadata_handles_code_fences(self, mock_completion):
         """Test that JSON wrapped in markdown code fences is parsed correctly."""
         mock_response = MagicMock()
@@ -59,7 +59,7 @@ class TestCategoriser:
         assert result["company"] == "RetailCo"
         assert result["categories"] == ["market analysis", "retail"]
 
-    @patch("src.categoriser.completion")
+    @patch("src.categoriser.llm_completion")
     def test_extract_metadata_truncates_long_documents(self, mock_completion):
         """Test that very long documents are truncated before sending to LLM."""
         mock_response = MagicMock()
@@ -75,13 +75,14 @@ class TestCategoriser:
         assert len(user_content) < 10000
         assert "truncated" in user_content.lower()
 
-    @patch("src.categoriser.completion")
+    @patch("src.categoriser.llm_completion")
     def test_extract_metadata_raises_on_malformed_json(self, mock_completion):
-        """Test that malformed LLM JSON response raises ValueError instead of crashing."""
+        """Test that malformed LLM JSON response is handled gracefully with a fallback."""
         mock_response = MagicMock()
         mock_response.choices = [MagicMock()]
         mock_response.choices[0].message.content = "This is not JSON at all, just some random text"
         mock_completion.return_value = mock_response
 
-        with pytest.raises(ValueError, match="malformed JSON"):
-            extract_metadata("# Test", Path("/data/test.md"))
+        result = extract_metadata("# Test", Path("/data/test.md"))
+        assert result["company"] == "Unknown"
+        assert "Uncategorised" in result["categories"]

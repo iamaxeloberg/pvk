@@ -47,6 +47,7 @@ def run_pipeline():
             logger.info(f"Skipping already converted: {fp.name}")
         else:
             try:
+                print(f"  Converting {fp.name}...")
                 md_path = convert_to_markdown(fp)
                 md_files.append(md_path)
             except Exception as e:
@@ -163,6 +164,7 @@ def query(question: str):
         # Step 2: Route to appropriate sub-agent and generate response
         print("Routing to specialised agent...\n")
         try:
+            print("Generating response...")
             result = route_query(question, relevant_paths)
             print(f"Agent used: {result.get('agent_used', 'unknown')}")
             print(f"\n{result.get('response', 'No response generated.')}")
@@ -262,15 +264,27 @@ if __name__ == "__main__":
         if len(sys.argv) < 3:
             print("Error: classify requires a question")
             sys.exit(1)
-        agent = classify_query(" ".join(sys.argv[2:]))
-        print(f"Recommended agent: {agent}")
+        try:
+            question = " ".join(sys.argv[2:])
+            print(f"Classifying query: {question}")
+            agent = classify_query(question)
+            print(f"Recommended agent: {agent}")
+        except Exception as e:
+            print(f"Classification error: {e}")
+            logger.error(f"Classify error: {e}", exc_info=True)
+            sys.exit(1)
     elif command == "kpi":
         if len(sys.argv) < 3:
             print("Error: kpi requires a company name")
             sys.exit(1)
         company = sys.argv[2]
         metric = sys.argv[3] if len(sys.argv) > 3 else None
-        kpi_trend(company, metric)
+        try:
+            kpi_trend(company, metric)
+        except Exception as e:
+            print(f"KPI query error: {e}")
+            logger.error(f"KPI error: {e}", exc_info=True)
+            sys.exit(1)
     else:
         print(f"Unknown command: {command}")
         sys.exit(1)

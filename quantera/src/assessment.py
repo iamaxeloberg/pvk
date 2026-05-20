@@ -8,9 +8,8 @@ import json
 import logging
 from dataclasses import dataclass, field
 from pathlib import Path
-from litellm import completion
 from config.settings import settings
-from src.utils import read_prompt, get_llm_content
+from src.utils import read_prompt, get_llm_content, llm_completion, safe_parse_llm_json
 
 logger = logging.getLogger(__name__)
 
@@ -132,7 +131,7 @@ Do not include any text outside the JSON."""
     ]
 
     try:
-        response = completion(
+        response = llm_completion(
             model=settings.high_capacity_llm_model,
             messages=messages,
             api_key=settings.high_capacity_llm_api_key or None,
@@ -142,14 +141,7 @@ Do not include any text outside the JSON."""
         )
 
         result_text = get_llm_content(response)
-        parts = result_text.split("```")
-        if len(parts) > 1:
-            result_text = parts[1]
-            if result_text.startswith("json"):
-                result_text = result_text[4:]
-        result_text = result_text.strip()
-
-        scores = json.loads(result_text)
+        scores = safe_parse_llm_json(result_text)
 
         def _safe_float(val, default=0.0) -> float:
             try:

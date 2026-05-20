@@ -87,7 +87,7 @@ class TestAssessmentReport:
 
 
 class TestAssessResponse:
-    @patch("src.assessment.completion")
+    @patch("src.assessment.llm_completion")
     def test_assess_response_returns_scores(self, mock_completion):
         scores = json.dumps({
             "factual_accuracy": 0.9,
@@ -112,7 +112,7 @@ class TestAssessResponse:
         assert result.overall_score == 0.88
         assert result.feedback == "Good answer"
 
-    @patch("src.assessment.completion")
+    @patch("src.assessment.llm_completion")
     def test_assess_response_handles_code_fences(self, mock_completion):
         scores = '```json\n{"factual_accuracy": 0.7, "completeness": 0.6, "consistency": 0.8, "overall_score": 0.7, "feedback": "OK"}\n```'
         mock_completion.return_value.choices = [MagicMock()]
@@ -121,7 +121,7 @@ class TestAssessResponse:
         result = assess_response("Q", "exp", "act")
         assert result.factual_accuracy == 0.7
 
-    @patch("src.assessment.completion")
+    @patch("src.assessment.llm_completion")
     def test_assess_response_handles_api_error(self, mock_completion):
         mock_completion.side_effect = Exception("API error")
 
@@ -131,7 +131,7 @@ class TestAssessResponse:
 
 
 class TestRunAssessmentSuite:
-    @patch("src.assessment.completion")
+    @patch("src.assessment.llm_completion")
     def test_run_suite_multiple_cases(self, mock_completion):
         scores = json.dumps({
             "factual_accuracy": 0.8,
