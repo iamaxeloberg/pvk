@@ -1,6 +1,6 @@
-PYTHON := .venv/bin/python3
+PYTHON := venv/bin/python3
 
-.PHONY: help install ingest query list seed test lint format clean serve
+.PHONY: help install ingest query list seed demo-prep test lint format clean serve
 
 help:
 	@echo "Quantera - AI-driven financial document indexing"
@@ -15,6 +15,7 @@ help:
 	@echo "  make classify Q=      Show which agent would handle the query"
 	@echo "  make kpi COMPANY=     Show KPI trends for a company"
 	@echo "  make kpi-metric COMPANY= METRIC=  Show specific KPI trend"
+	@echo "  make demo-prep        Reset & prep all demo data (run before demo)"
 	@echo "  make seed             Generate synthetic test data"
 	@echo "  make validate LABELS= Run categorisation validation"
 	@echo "  make test             Run test suite"
@@ -45,6 +46,10 @@ list:
 
 seed:
 	$(PYTHON) scripts/seed_test_data.py
+
+demo-prep:
+	@echo "Preparing demo environment..."
+	$(PYTHON) scripts/demo_prep.py
 
 classify:
 ifndef Q

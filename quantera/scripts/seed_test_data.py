@@ -12,54 +12,90 @@ from config.settings import settings
 
 SAMPLE_COMPANIES = [
     {
-        "name": "TechCorp AB",
+        "name": "Volvo Group",
         "document": "Q1 2025 Financial Report",
         "data": [
             ["Metric", "Value", "Change YoY"],
-            ["Total Revenue", "SEK 145.2M", "+12%"],
-            ["Recurring Revenue", "SEK 98.5M", "+18%"],
-            ["Gross Margin", "62.3%", ""],
-            ["EBITDA Margin", "24.1%", ""],
-            ["Operating Margin", "18.7%", ""],
-            ["Operating Cash Flow", "SEK 32.1M", ""],
-            ["Free Cash Flow", "SEK 28.4M", ""],
-            ["ARR", "SEK 410M", ""],
-            ["NRR", "115%", ""],
-            ["Customer Count", "342", ""],
-        ],
-    },
-    {
-        "name": "Nordic Retail Group",
-        "document": "Annual Portfolio Review 2024",
-        "data": [
-            ["Metric", "Value", "Notes"],
-            ["Revenue", "SEK 2.1B", "-3% YoY"],
-            ["Gross Margin", "34.2%", ""],
-            ["EBITDA", "SEK 185M", ""],
-            ["Net Debt", "SEK 420M", ""],
-            ["Store Count", "127", "Sweden, Norway, Denmark"],
-            ["Planned Closures", "8-12", ""],
-            ["Digital Investment", "SEK 45M", ""],
+            ["Net Sales", "SEK 132.4B", "+8%"],
+            ["Adjusted Operating Income", "SEK 18.9B", "+12%"],
+            ["Operating Margin", "14.3%", "+0.5pp"],
+            ["EBITDA", "SEK 24.1B", "+10%"],
+            ["EBITDA Margin", "18.2%", "+0.3pp"],
+            ["Free Cash Flow", "SEK 8.7B", "+22%"],
+            ["Net Financial Position", "SEK -42.1B", ""],
+            ["Truck Deliveries", "55,400", "+6%"],
+            ["Order Intake", "48,200", "-4%"],
+            ["Employees", "102,000", "+1,200"],
         ],
         "risks": [
-            "Increasing competition from e-commerce",
-            "Rising labor costs in Sweden",
-            "Currency exposure in Norway and Denmark",
+            "Slowdown in North American heavy-duty truck market",
+            "European emission regulation changes increasing R&D costs",
+            "Supply chain disruptions for battery components",
         ],
     },
     {
-        "name": "GreenEnergy Solutions",
-        "document": "Market Analysis 2025",
+        "name": "Ericsson",
+        "document": "Q1 2025 Financial Report",
         "data": [
-            ["Metric", "Value", "Notes"],
-            ["Nordic Wind Market Share", "14%", ""],
-            ["Installed Capacity", "890 MW", ""],
-            ["Pipeline Projects", "340 MW", ""],
-            ["Expected Revenue 2025", "SEK 680M", ""],
-            ["Expected EBITDA Margin", "31-33%", ""],
-            ["CapEx Requirement", "SEK 220M", ""],
+            ["Metric", "Value", "Change YoY"],
+            ["Net Sales", "SEK 53.3B", "-2%"],
+            ["Gross Income", "SEK 20.1B", "-4%"],
+            ["Gross Margin", "37.7%", "-0.8pp"],
+            ["EBIT", "SEK 3.8B", "-18%"],
+            ["EBIT Margin", "7.1%", "-1.4pp"],
+            ["Net Income", "SEK 2.4B", "-25%"],
+            ["Free Cash Flow", "SEK -1.2B", ""],
+            ["R&D Spending", "SEK 10.8B", "+3%"],
+            ["5G Contracts Signed", "142", "+8"],
+            ["Employees", "96,000", "-4,000"],
         ],
-        "competitors": ["Vattenfall", "Orsted", "Statkraft"],
+        "risks": [
+            "Slower 5G rollout in key markets (India, Europe)",
+            "Increased competition from Huawei and Nokia",
+            "Margin pressure from enterprise networking segment",
+        ],
+    },
+    {
+        "name": "Atlas Copco",
+        "document": "Q1 2025 Financial Report",
+        "data": [
+            ["Metric", "Value", "Change YoY"],
+            ["Revenues", "SEK 41.2B", "+11%"],
+            ["EBIT", "SEK 9.1B", "+15%"],
+            ["EBIT Margin", "22.1%", "+0.7pp"],
+            ["Net Profit", "SEK 7.0B", "+14%"],
+            ["Operating Cash Flow", "SEK 6.8B", "+9%"],
+            ["Free Cash Flow", "SEK 5.4B", "+11%"],
+            ["Orders Received", "SEK 43.5B", "+7%"],
+            ["Acquisitions (YTD)", "SEK 2.1B", ""],
+            ["Employees", "49,000", "+2,100"],
+        ],
+        "risks": [
+            "Slowing industrial automation demand in China",
+            "Currency headwinds from strong SEK vs USD",
+            "Integration risk from recent compressor acquisitions",
+        ],
+    },
+    {
+        "name": "Investor AB",
+        "document": "Q1 2025 Portfolio Update",
+        "data": [
+            ["Metric", "Value", "Change YoY"],
+            ["Net Asset Value (NAV)", "SEK 685B", "+5%"],
+            ["NAV per Share", "SEK 226.40", "+6%"],
+            ["Portfolio Value", "SEK 712B", "+4%"],
+            ["Dividend Income (Q1)", "SEK 4.2B", "+3%"],
+            ["Net Cash Position", "SEK 28.5B", ""],
+            ["Core Holdings", "12", ""],
+            ["New Investments (Q1)", "SEK 8.3B", ""],
+            ["Divestments (Q1)", "SEK 3.1B", ""],
+            ["Share Buybacks (Q1)", "SEK 2.0B", ""],
+        ],
+        "risks": [
+            "Concentration risk in Swedish large-cap holdings",
+            "Private equity valuation uncertainty in higher-rate environment",
+            "Currency exposure via unhedged international holdings",
+        ],
     },
 ]
 
@@ -76,6 +112,10 @@ def generate_test_data():
         rows = [["Company", "Document", "Metric", "Value", "Notes"]]
         for row in company["data"]:
             rows.append([company["name"], company["document"]] + row + [""] * (5 - len(row) - 2))
+
+        # Add risk factors if present
+        for risk in company.get("risks", []):
+            rows.append([company["name"], company["document"], "Risk Factor", risk, ""])
 
         with open(filepath, "w", newline="", encoding="utf-8") as f:
             writer = csv.writer(f)
