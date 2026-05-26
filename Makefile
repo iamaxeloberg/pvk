@@ -1,6 +1,6 @@
 PYTHON := venv/bin/python3
 
-.PHONY: help install ingest query list seed demo-prep test lint format clean serve
+.PHONY: help install ingest query list seed demo-prep test lint format clean dist serve test-file
 
 help:
 	@echo "Quantera - AI-driven financial document indexing"
@@ -86,6 +86,16 @@ lint:
 
 format:
 	$(PYTHON) -m ruff format .
+
+test-file:
+ifndef F
+	$(error F is required. Usage: make test-file F=test_kpi_store.py)
+endif
+	$(PYTHON) -m pytest tests/$(F) -v
+
+dist:
+	git archive --format=zip --prefix=quantera/ --output=quantera-0.1.0.zip HEAD
+	@echo "Created quantera-0.1.0.zip"
 
 clean:
 	rm -rf __pycache__ */__pycache__ .pytest_cache logs/

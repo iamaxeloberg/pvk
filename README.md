@@ -343,21 +343,70 @@ make format
 
 # Clean generated files (cache, database, markdown, logs)
 make clean
+
+# Create a distributable zip file for handover
+make dist
 ```
 
-### Test Structure
+## Testing
 
-Tests are organized per module and can be run selectively:
+The project includes **114 tests across 13 test modules** covering all pipeline stages, sub-agents, edge cases, and error handling.
+
+### Test Suite Overview
+
+| Test File | Tests | What it covers |
+|-----------|-------|---------------|
+| `test_agents.py` | 18 | Agent router classification, KPI extraction/formatting, insight generation, briefing generation, agent integration |
+| `test_assessment.py` | 10 | Assessment result scoring, pass/fail thresholds, report aggregation, LLM response evaluation, report file output |
+| `test_categoriser.py` | 5 | Metadata extraction with mocked LLM, code fence handling, JSON parsing, malformed JSON error, long doc truncation |
+| `test_chunker.py` | 7 | Small text passthrough, large text splitting, chunk metadata, sequential indices, empty text, token estimation, overlap preservation |
+| `test_converter.py` | 2 | Empty batch handling, invalid file type rejection |
+| `test_generator.py` | 6 | Prompt reading, no-doc response, missing doc handling, mocked generation, model selection, multi-doc combination |
+| `test_indexer.py` | 8 | DB init, insert/retrieve, duplicate handling, company/category filtering, count, delete, existence check |
+| `test_ingestion.py` | 6 | Supported extensions, file validation, nonexistent files, file discovery, empty/nonexistent directories |
+| `test_kpi_store.py` | 10 | KPI table init, store/retrieve, trend ordering (quarter/year), company listing, metric listing, delete, non-numeric values |
+| `test_pipeline.py` | 5 | Empty input dir, invalid file type, idempotent DB init, querying empty DB, missing file conversion |
+| `test_retriever.py` | 7 | Index context building, empty context, prompt reading, mocked retrieval, invalid path filtering, empty response, multi-path |
+| `test_validation.py` | 9 | Category perfect/partial/no match, case insensitivity, empty sets, company name normalisation, different companies |
+| `test_vector_search.py` | 11 | Vector table init, embedding store/retrieve, missing embeddings, cosine similarity (identical/orthogonal/opposite/zero), search results, threshold/top-k respect, model fallback |
+
+### Running Tests
 
 ```bash
+# Run the full test suite
+make test                              # 114 tests, ~1 second
+
 # Run a specific test file
-python -m pytest tests/test_kpi_store.py -v
+make test-file F=test_kpi_store.py    # or: python -m pytest tests/test_kpi_store.py -v
 
 # Run a specific test class
 python -m pytest tests/test_agents.py::TestAgentRouter -v
 
+# Run a single test
+python -m pytest tests/test_indexer.py::TestIndexer::test_init_db -v
+
 # Run with coverage report
 python -m pytest tests/ -v --cov=src --cov-report=term-missing
+```
+
+### How Tests Work
+
+**Database tests** create temporary SQLite databases via `tempfile` — no persistent state is modified. Each test gets its own isolated database that is discarded afterward.
+
+**LLM tests** use Python's `unittest.mock` to intercept LiteLLM API calls. Mocked responses return pre-written JSON that exercises specific scenarios (valid metadata, malformed JSON, empty responses, etc.). This means tests run offline — no API keys or network access required.
+
+**Conversion tests** run against a `data/input/` directory that can be populated with test fixtures. The converter handles all three supported formats (PDF, XLSX, CSV).
+
+**3 tests are skipped** when run without a live LLM backend, as they exercise the full request/response cycle. These tests have `@pytest.mark.skipif` decorators and do not affect the pass count.
+
+### Generating Test Data
+
+```bash
+# Generate synthetic financial documents (4 Swedish companies)
+make seed                              # Creates CSV files in data/input/
+
+# Alternative: generate Acme Corp test data (CSV, XLSX, PDF)
+python scripts/make_test_files.py
 ```
 
 ## CI/CD
@@ -368,6 +417,22 @@ GitHub Actions runs on every push and pull request to `main`:
 - **Test** — `pytest` with coverage on Python 3.10, 3.11, and 3.12
 - **Database** — tests use temporary SQLite databases, no external services needed
 - **LLM** — tests use mocked LiteLLM responses, no API keys required in CI
+
+## Handover / Distribution
+
+To create a clean zip file for distribution:
+
+```bash
+make dist
+```
+
+This produces `quantera-{version}.zip` at the repository root, containing:
+- All source code, prompts, scripts, and tests
+- Configuration templates (`.env.example`, `pyproject.toml`)
+- README and demo documentation
+- Empty data directories ready for input files
+
+The zip **excludes** virtual environments, databases, logs, cache files, IDE config, and any personal/team-internal documents.
 
 ## Requirements
 
