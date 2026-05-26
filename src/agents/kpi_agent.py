@@ -2,10 +2,9 @@
 
 import logging
 import sqlite3
-from pathlib import Path
 
 from config.settings import settings
-from src.utils import get_llm_content, llm_completion, read_prompt, safe_parse_llm_json
+from src.utils import get_llm_content, llm_completion, load_documents_for_prompt, read_prompt, safe_parse_llm_json
 
 logger = logging.getLogger(__name__)
 
@@ -27,21 +26,10 @@ def extract_kpis(
     """
     prompt = read_prompt("kpi_extraction")
 
-    doc_contents = []
-    for doc_path in relevant_documents:
-        path = Path(doc_path)
-        if path.exists():
-            content = path.read_text(encoding="utf-8")
-            if len(content) > settings.max_doc_size_chars:
-                content = content[: settings.max_doc_size_chars] + "\n\n[Document truncated due to size...]"
-            doc_contents.append(f"--- Document: {path.name} ---\n{content}")
-        else:
-            logger.warning(f"Document not found: {doc_path}")
+    combined_docs = load_documents_for_prompt(relevant_documents, settings.max_doc_size_chars)
 
-    if not doc_contents:
+    if not combined_docs:
         return {"company": "", "period": "", "kpis": [], "error": "No relevant documents found"}
-
-    combined_docs = "\n\n".join(doc_contents)
 
     messages = [
         {"role": "system", "content": prompt},

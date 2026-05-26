@@ -1,10 +1,9 @@
 """Briefing Sub-Agent - Creates executive briefings from financial documents."""
 
 import logging
-from pathlib import Path
 
 from config.settings import settings
-from src.utils import get_llm_content, llm_completion, read_prompt
+from src.utils import get_llm_content, llm_completion, load_documents_for_prompt, read_prompt
 
 logger = logging.getLogger(__name__)
 
@@ -13,25 +12,10 @@ def generate_briefing(user_query: str, relevant_documents: list[str]) -> str:
     """Generate an executive briefing from relevant documents."""
     prompt = read_prompt("executive_briefing")
 
-    doc_contents = []
-    for doc_path in relevant_documents:
-        path = Path(doc_path)
-        if path.exists():
-            try:
-                content = path.read_text(encoding="utf-8")
-            except (UnicodeDecodeError, PermissionError, OSError) as e:
-                logger.warning(f"Could not read {doc_path}: {e}")
-                continue
-            if len(content) > settings.max_doc_size_chars:
-                content = content[: settings.max_doc_size_chars] + "\n\n[Document truncated due to size...]"
-            doc_contents.append(f"--- Document: {path.name} ---\n{content}")
-        else:
-            logger.warning(f"Document not found: {doc_path}")
+    combined_docs = load_documents_for_prompt(relevant_documents, settings.max_doc_size_chars)
 
-    if not doc_contents:
+    if not combined_docs:
         return "No relevant documents found to generate a briefing."
-
-    combined_docs = "\n\n".join(doc_contents)
 
     messages = [
         {"role": "system", "content": prompt},

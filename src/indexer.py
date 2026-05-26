@@ -6,13 +6,9 @@ import sqlite3
 from pathlib import Path
 
 from config.settings import settings
+from src.utils import escape_like
 
 logger = logging.getLogger(__name__)
-
-
-def _escape_like(value: str) -> str:
-    """Escape SQL LIKE wildcard characters in a search value."""
-    return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
 
 
 def init_db(db_path: Path | None = None) -> sqlite3.Connection:
@@ -74,7 +70,7 @@ def get_documents_by_company(conn: sqlite3.Connection, company: str) -> list[dic
     """Retrieve documents for a specific company."""
     cursor = conn.execute(
         "SELECT id, company, categories, markdown_file_path FROM documents WHERE company LIKE ? ESCAPE '\\'",
-        (f"%{_escape_like(company)}%",),
+        (f"%{escape_like(company)}%",),
     )
     rows = cursor.fetchall()
     return [
@@ -92,7 +88,7 @@ def get_documents_by_category(conn: sqlite3.Connection, category: str) -> list[d
     """Retrieve documents matching a specific category."""
     cursor = conn.execute(
         "SELECT id, company, categories, markdown_file_path FROM documents WHERE categories LIKE ? ESCAPE '\\'",
-        (f"%{_escape_like(category)}%",),
+        (f"%{escape_like(category)}%",),
     )
     rows = cursor.fetchall()
     return [

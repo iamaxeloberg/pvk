@@ -6,16 +6,12 @@ import sqlite3
 from pathlib import Path
 
 from config.settings import settings
+from src.utils import escape_like
 
 logger = logging.getLogger(__name__)
 
 _QUARTER_MAP = {"q1": 1, "q2": 2, "q3": 3, "q4": 4}
 _HALF_MAP = {"h1": 1, "h2": 2}
-
-
-def _escape_like(value: str) -> str:
-    """Escape SQL LIKE wildcard characters in a search value."""
-    return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
 
 
 def _period_sort_key(period: str) -> tuple:
@@ -138,7 +134,7 @@ def get_kpi_trend(
         """SELECT period, value, value_raw, unit, context, source_file, extracted_at
            FROM kpi_store
            WHERE company LIKE ? ESCAPE '\\' AND metric LIKE ? ESCAPE '\\'""",
-        (f"%{_escape_like(company)}%", f"%{_escape_like(metric)}%"),
+        (f"%{escape_like(company)}%", f"%{escape_like(metric)}%"),
     )
     rows = cursor.fetchall()
     results = [
@@ -171,7 +167,7 @@ def get_all_kpis_for_company(conn: sqlite3.Connection, company: str) -> dict[str
         """SELECT metric, period, value, value_raw, unit, context, source_file
            FROM kpi_store
            WHERE company LIKE ? ESCAPE '\\'""",
-        (f"%{_escape_like(company)}%",),
+        (f"%{escape_like(company)}%",),
     )
     rows = cursor.fetchall()
 
@@ -213,6 +209,6 @@ def delete_kpis_for_company(conn: sqlite3.Connection, company: str) -> int:
     Returns:
         Number of rows deleted
     """
-    cursor = conn.execute("DELETE FROM kpi_store WHERE company LIKE ? ESCAPE '\\'", (f"%{_escape_like(company)}%",))
+    cursor = conn.execute("DELETE FROM kpi_store WHERE company LIKE ? ESCAPE '\\'", (f"%{escape_like(company)}%",))
     conn.commit()
     return cursor.rowcount

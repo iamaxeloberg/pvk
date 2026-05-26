@@ -158,6 +158,33 @@ def safe_parse_llm_json(text: str) -> dict:
     return parsed
 
 
+def escape_like(value: str) -> str:
+    """Escape SQL LIKE wildcard characters in a search value."""
+    return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+
+
+def load_documents_for_prompt(relevant_documents: list[str], max_chars: int) -> str:
+    """Load and combine document contents for use in an LLM prompt."""
+    logger = logging.getLogger(__name__)
+
+    doc_contents = []
+    for doc_path in relevant_documents:
+        path = Path(doc_path)
+        if path.exists():
+            try:
+                content = path.read_text(encoding="utf-8")
+            except (UnicodeDecodeError, PermissionError, OSError) as e:
+                logger.warning(f"Could not read {doc_path}: {e}")
+                continue
+            if len(content) > max_chars:
+                content = content[:max_chars] + "\n\n[Document truncated due to size...]"
+            doc_contents.append(f"--- Document: {path.name} ---\n{content}")
+        else:
+            logger.warning(f"Document not found: {doc_path}")
+
+    return "\n\n".join(doc_contents)
+
+
 def ensure_dir(path: Path) -> Path:
     """Ensure a directory exists, creating it if necessary."""
     path.mkdir(parents=True, exist_ok=True)
