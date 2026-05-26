@@ -1,0 +1,51 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "quantera"
+version = "0.1.0"
+description = "AI-driven financial document indexing and query system"
+requires-python = ">=3.10"
+dependencies = [
+    "marker-pdf>=1.0.0,<2.0.0",
+    "litellm~=1.30.0",
+    "python-dotenv~=1.0.0",
+    "pydantic>=2.7.1,<3.0.0",
+    "pydantic-settings>=2.0.0,<3.0.0",
+    "openpyxl~=3.1.0",
+    "fastapi~=0.110.0",
+    "uvicorn~=0.29.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest~=7.0.0",
+    "pytest-cov~=4.0.0",
+    "ruff~=0.1.0",
+]
+vector = [
+    "sentence-transformers~=2.2.0",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+target-version = "py310"
+line-length = 160
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "W", "UP"]
+
+[tool.ruff.lint.per-file-ignores]
+# Test files manipulate sys.path before imports and contain dead code from skipped tests
+"tests/*" = ["E402", "F841"]
+# Scripts have long log/print strings that don't benefit from wrapping and run sys.path manipulation
+"scripts/*" = ["E501", "E402"]
+# api.py and web.py manipulate sys.path before imports so they can be run directly
+"src/api.py" = ["E402"]
+"src/web.py" = ["E402"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
